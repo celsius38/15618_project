@@ -58,15 +58,18 @@ What to demonstrate: this project is more research oriented instead of applicati
 The algorithm G-DBSCAN we chose as a starting point is targeting for GPU, so it’s better if we do optimization on the same platform for performance comparison. However, the size of dataset has been growing rapidly in real life, so that a single machine can not meet the requirement in most cases. So it’s meaningful and necessary to be able to efficiently run clustering algorithm on distributed machines. That’s why we also plan to adapt the algorithm for message passing model running on a cluster of machines. 
 
 
-## Schedule 
-| Week                | Goal                               | Detail                                                               |
-|---------------------|------------------------------------|----------------------------------------------------------------------|
-| Week 1(10/29-11/05) | Research                           | Write proposal, read related paper and implement sequential version. |
+## Schedule
+
+| Week| Goal| Detail|
+|-----|-----|-------|
+| Week 1(10/29-11/05) | Research | Write proposal, read related paper and implement sequential version. |
 | Week 2(11/05-11/12) | 1st Parallel Implementation        | Implement G-DBSCAN with CUDA and do analysis.                        |
 | Week 3(11/12-11/19) | Optimization (Checkpoint!)         | Conduct optimization and write checkpoint report.                    |
 | Week 4(11/19-11/26) | MPI Version                        | Improve and implement MPI version running on cluster.                |
 | Week 5(11/26-12/03) | Performance analysis               | Run experiments on different datasets and draw graphs.               |
 | Week 6(12/03-12/10) | Wrap up (Final report and poster!) | Run more experiments and prepare final report and poster.            |
+
+
 ## References
 
 [1] Ester, M., Kriegel, H.P., Sander, J. and Xu, X., 1996, August. A density-based algorithm for discovering clusters in large spatial databases with noise. In Kdd (Vol. 96, No. 34, pp. 226-231).
