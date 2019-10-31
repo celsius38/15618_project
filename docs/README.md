@@ -1,9 +1,3 @@
-# Parallel Density-based Clustering Algorithm
-### Sailun Xu (sailunx)
-### Yueni Liu (yuenil)
-
-at: [github](https://celsius38.github.io/15618_project/)
-
 ## Summary
 
 We are going to implement and optimize a density-based clustering algorithm [dbscan] on both GPU (CUDA) and distributed memory (MPI), and perform a detailed analysis and comparison on various datasets.
