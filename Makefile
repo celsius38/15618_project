@@ -1,15 +1,16 @@
 # CXX=mpic++
 OUTPUTDIR := bin/
 
-CFLAGS := -std=c++11 fvisibility=hidden -lpthread
+CFLAGS := -std=c++11 -fvisibility=hidden -lpthread -lm
+
 ifeq (,$(CONFIG))
 	CONFIG := release
 endif
 
 ifeq (debug,$(CONFIG))
-	CFLAGS += -g   # debug flag, no omp should work as well
+CFLAGS += -g   # debug flag, no omp should work as well
 else
-	CFLAGS += -O2 -fopenmp 
+CFLAGS += -O2 -fopenmp 
 endif
 
 SOURCES := src/*.cpp
@@ -20,7 +21,7 @@ TARGETBIN := dbscan-$(CONFIG)
 all: $(TARGETBIN)
 
 clean:
-	/bin/rm -rf $(OBJDIR) *~ $(APP_NAME)
+	/bin/rm -rf $(OBJDIR) *~ $(TARGETBIN)
 
 $(TARGETBIN): $(SOURCES) $(HEADERS)
-	$(CXX) -o $@ $(CFLAGS) $^
+	$(CXX) -o $@ $(CFLAGS) $(SOURCES)
