@@ -2,8 +2,9 @@
 #define DBSCAN_H
 
 #include <vector>
+#include <memory>
 #include "dbscan.h"
-#include "world.h"
+#include "utils.h"
 
 class DBScanner{
 public:

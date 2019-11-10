@@ -1,5 +1,5 @@
-#ifndef WORLD_H
-#define WORLD_H
+#ifndef UTILS_H
+#define UTILS_H
 
 #include <math.h>
 
