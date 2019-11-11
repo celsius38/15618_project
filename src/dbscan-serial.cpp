@@ -44,10 +44,12 @@ public:
     }
 
 private:
+    /* return the list of neighbors for each point,
+     * a point's neighbors include the point itself
+     */
     std::vector<std::vector<size_t>> findNeighbors(
         std::vector<Vec2> &points, float eps
     ){
-        // return neighbors as adjacency list
         std::vector<std::vector<size_t>> neighbors;
         neighbors.reserve(points.size());
         for(size_t i = 0; i < points.size(); i++){
