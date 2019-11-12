@@ -1,3 +1,5 @@
+benchmark-files
+*.swp
 *.DS_Store
 *.i
 *.ii

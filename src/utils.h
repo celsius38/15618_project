@@ -1,6 +1,7 @@
 #ifndef UTILS_H
 #define UTILS_H
 
+#include <iostream>
 #include <math.h>
 
 
@@ -98,6 +99,11 @@ public:
     inline float length()
     {
         return sqrt(x*x + y*y);
+    }
+
+    friend std::ostream& operator << (std::ostream &out, const Vec2& vec){
+        out << "(" << vec.x << "," << vec.y << ")";
+        return out;
     }
 };
 

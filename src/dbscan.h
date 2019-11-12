@@ -15,4 +15,5 @@ public:
 
 std::unique_ptr<DBScanner> createSequentialDBScanner();
 
+
 #endif

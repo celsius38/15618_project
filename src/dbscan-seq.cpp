@@ -2,6 +2,8 @@
 #include <deque>
 #include "dbscan.h"
 
+#include "make_unique.h"
+
 class SequentialDBScanner: public DBScanner
 {
 public: 
@@ -10,7 +12,7 @@ public:
      */
     void scan(
         std::vector<Vec2> &points, std::vector<int> &labels, float eps, int minPts
-    ){
+    ){ 
         using std::vector;
         using std::deque;
         vector<vector<size_t>> allNeighbors = findNeighbors(points, eps);
@@ -50,8 +52,7 @@ private:
     std::vector<std::vector<size_t>> findNeighbors(
         std::vector<Vec2> &points, float eps
     ){
-        std::vector<std::vector<size_t>> neighbors;
-        neighbors.reserve(points.size());
+        std::vector<std::vector<size_t>> neighbors(points.size());
         for(size_t i = 0; i < points.size(); i++){
             Vec2 p1 = points[i];
             std::vector<size_t> &p1_neighbors = neighbors[i];
@@ -67,3 +68,9 @@ private:
         return neighbors;
     }
 };
+
+std::unique_ptr<DBScanner> createSequentialDBScanner(){
+    return std::make_unique<SequentialDBScanner>();
+}
+
+
