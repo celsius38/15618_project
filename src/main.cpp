@@ -49,8 +49,7 @@ Options parseOptions(int argc, const char ** argv){
         }else if(strcmp(argv[i], "-eps") == 0){
             opt.eps = (float)atof(argv[i+1]);
         }else if(strcmp(argv[i], "-minPts") == 0){
-            opt.eps = (int)atoi(argv[i+1]);
-            
+            opt.minPts = (int)atoi(argv[i+1]);
         }
         else if(strcmp(argv[i],"-seq")){
             opt.scannerType = ScannerType::Sequential;
