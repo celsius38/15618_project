@@ -7,16 +7,17 @@
 class SequentialDBScanner: public DBScanner
 {
 public: 
-    /* return vector of label that has the same length as `points`
+    /* Return total number of clusters
+     * insert corresponding cluster id in `labels`
      * -1 stands for noise, 0 for unprocessed, otherwise stands for the cluster id
      */
-    void scan(
+    size_t scan(
         std::vector<Vec2> &points, std::vector<int> &labels, float eps, int minPts
     ){ 
         using std::vector;
         using std::deque;
         vector<vector<size_t>> allNeighbors = findNeighbors(points, eps);
-        int counter = 0;  // current number of clusters
+        size_t counter = 0;  // current number of clusters
         for(size_t i = 0; i < points.size(); i++){
             auto point = points[i];
             auto label = labels[i];
@@ -43,6 +44,7 @@ public:
                 }
             }
         }
+        return counter;
     }
 
 private:

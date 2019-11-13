@@ -1,4 +1,5 @@
 benchmark-files
+*.pyc
 *.swp
 *.DS_Store
 *.i

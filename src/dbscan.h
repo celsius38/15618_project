@@ -9,7 +9,7 @@
 class DBScanner{
 public:
     //pure virtual function
-    virtual void scan(std::vector<Vec2> &points, std::vector<int> &labels, float eps,  int minPts) = 0;
+    virtual size_t scan(std::vector<Vec2> &points, std::vector<int> &labels, float eps,  int minPts) = 0;
     virtual ~DBScanner(){};
 };
 

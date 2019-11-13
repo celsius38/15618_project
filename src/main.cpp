@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <sys/stat.h>
 
+#include "CycleTimer.h"
 #include "utils.h"
 #include "dbscan.h"
 
@@ -26,7 +27,6 @@ std::ostream& operator<<(std::ostream& out, const ScannerType &value){
 struct Options
 { 
     std::string inFile;
-    std::string outFile;
     float eps = 1;
     int minPts = 10;
     ScannerType scannerType = ScannerType::Sequential;
@@ -44,8 +44,6 @@ Options parseOptions(int argc, const char ** argv){
     for(int i = 1; i < argc; i++){
         if (strcmp(argv[i],  "-in") == 0){
             opt.inFile = removeQuote(argv[i+1]);
-        }else if(strcmp(argv[i], "-out") == 0){
-            opt.outFile = removeQuote(argv[i+1]);
         }else if(strcmp(argv[i], "-eps") == 0){
             opt.eps = (float)atof(argv[i+1]);
         }else if(strcmp(argv[i], "-minPts") == 0){
@@ -58,11 +56,6 @@ Options parseOptions(int argc, const char ** argv){
     if(opt.inFile.empty()){
         std::cerr << "Please specify input file -in" << std::endl;
         exit(EXIT_FAILURE);
-    }
-    if(opt.outFile.empty()){
-        std::string rawName = opt.inFile.substr(opt.inFile.find_last_of("/")+1);
-        rawName = rawName.substr(0, rawName.find_last_of("."));
-        opt.outFile = "logs/" + rawName + ".out";
     }
     return opt;
 }
@@ -96,24 +89,27 @@ std::vector<Vec2> loadFromFile(std::string fileName){
 int main(int argc, const char ** argv){
     Options options = parseOptions(argc, argv);
     std::cout << "inFile: " << options.inFile << std::endl;
-    std::cout << "outFile: " << options.outFile << std::endl;
     std::cout << "scannerType: " << options.scannerType << std::endl;
     std::cout << "eps: " << options.eps << std::endl;
     std::cout << "minPts: " << options.minPts << std::endl;
-
+    // load points
     std::vector<Vec2> points = loadFromFile(options.inFile);
+    // choose scanner type
     std::unique_ptr<DBScanner> scanner;
     switch(options.scannerType){
         case ScannerType::Sequential:
             scanner = createSequentialDBScanner();
             break;
     }
+    // scan
     std::vector<int> labels(points.size(), 0);
-    scanner->scan(points, labels, options.eps, options.minPts);
-    std::cout << labels.size() << std::endl;
+    double start = CycleTimer::currentMSeconds(); 
+    size_t numClusters = scanner->scan(points, labels, options.eps, options.minPts);
+    std::cout << "Taking " << CycleTimer::currentMSeconds()-start << " ms"<< std::endl;
+    std::cout << "=====================" << std::endl;
+    std::cout << numClusters << " Clusters" << std::endl; 
     for(auto label: labels){
-        std::cout << label << ' ';
+        std::cout << label << std::endl;
     }
-    std::cout << std::endl;
 }
 
