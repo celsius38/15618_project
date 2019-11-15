@@ -42,19 +42,18 @@ std::string removeQuote(std::string input)
 Options parseOptions(int argc, const char ** argv){
     Options opt;
     for(int i = 1; i < argc; i++){
-        if (strcmp(argv[i],  "-in") == 0){
+        if (strcmp(argv[i],  "--input") == 0){
             opt.inFile = removeQuote(argv[i+1]);
-        }else if(strcmp(argv[i], "-eps") == 0){
+        }else if(strcmp(argv[i], "--eps") == 0){
             opt.eps = (float)atof(argv[i+1]);
-        }else if(strcmp(argv[i], "-minPts") == 0){
+        }else if(strcmp(argv[i], "--minPts") == 0){
             opt.minPts = (int)atoi(argv[i+1]);
-        }
-        else if(strcmp(argv[i],"-seq")){
+        }else if(strcmp(argv[i],"--seq")){
             opt.scannerType = ScannerType::Sequential;
         }
     }
     if(opt.inFile.empty()){
-        std::cerr << "Please specify input file -in" << std::endl;
+        std::cerr << "Please specify input file --input" << std::endl;
         exit(EXIT_FAILURE);
     }
     return opt;
@@ -111,5 +110,6 @@ int main(int argc, const char ** argv){
     for(auto label: labels){
         std::cout << label << std::endl;
     }
+    return 0;
 }
 
