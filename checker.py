@@ -12,14 +12,14 @@ import pandas as pd
 # constant definitions
 EPS = 1
 MIN_PTS = 10 
-BINARY = "./dbscan-release"
+BINARY = "./src/dbscan-release"
 LOGS_DIR = "logs"
 # TODO: add more scanner types and input files
 SCANNER_TYPES = ["seq", "seq2", "par"]
 IN_FILES = ["src/benchmark-files/" + x for x in 
     [f"{case}-{n}.in"  
         for case in ["random"]  
-        for n in [1000, 10000]]
+        for n in [1000, 10000, 100000]]
 ]
 
 

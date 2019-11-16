@@ -3,6 +3,16 @@
 
 #include "make_unique.h"
 
+void bfs_cuda(size_t* vertex_degree, 
+                size_t* vertex_start_index,
+                size_t* adj_list, 
+                size_t* boarder,  
+                size_t minPts, 
+                int* labels, 
+                int counter,
+                size_t N,
+                size_t adj_list_len);
+
 class ParallelDBScanner: public DBScanner
 {
 public: 
@@ -11,7 +21,7 @@ public:
      * -1 stands for noise, 0 for unprocessed, otherwise stands for the cluster id
      */
     size_t scan(
-        std::vector<Vec2> &points, std::vector<int> &labels, float eps, int minPts
+        std::vector<Vec2> &points, std::vector<int> &labels, float eps, size_t minPts
     ){ 
         using std::vector;
 
@@ -22,7 +32,6 @@ public:
 
         size_t counter = 0;  // current number of clusters
         for(size_t i = 0; i < points.size(); i++){
-            auto point = points[i];
             auto label = labels[i];
             // already in a cluster, skip
             if(label > 0) continue;
@@ -39,32 +48,6 @@ public:
     }
 
 private:
-    void bfs_kernel(std::vector<size_t> &vertex_degree, 
-                    std::vector<size_t> &vertex_start_index,
-                    std::vector<size_t> &adj_list, 
-                    std::vector<size_t> &boarder, 
-                    int j, 
-                    int minPts, 
-                    std::vector<int> &labels, 
-                    int counter) {
-        if(boarder[j]) {
-            boarder[j] = 0;
-            labels[j] = counter;
-            if(vertex_degree[j] < minPts) {
-                return;
-            }
-            size_t start_index = vertex_start_index[j];
-            size_t end_index = start_index + vertex_degree[j];
-            for(size_t neighbor_index = start_index; 
-                neighbor_index < end_index; 
-                neighbor_index++) {
-                size_t neighbor = adj_list[neighbor_index];
-                if(labels[neighbor] <= 0) {
-                    boarder[neighbor] = 1;
-                }
-            }
-        }
-    }
 
     bool isEmpty(std::vector<size_t> boarder) {
         for(size_t i = 0; i < boarder.size(); i++) {
@@ -81,15 +64,20 @@ private:
             std::vector<size_t> &adj_list, 
             size_t counter, 
             std::vector<int> &labels, 
-            int minPts) {
+            size_t minPts) {
         // TODO: use bit vector
         std::vector<size_t> boarder(vertex_degree.size(), 0);
         boarder[i] = 1;
         while(!isEmpty(boarder)) {
-            for(size_t j = 0; j < vertex_degree.size(); j++) {
-                // TODO: CUDA version removes j
-                bfs_kernel(vertex_degree, vertex_start_index, adj_list, boarder, j, minPts, labels, counter);
-            }
+            bfs_cuda(vertex_degree.data(), 
+                vertex_start_index.data(), 
+                adj_list.data(), 
+                boarder.data(), 
+                minPts, 
+                labels.data(), 
+                counter,
+                vertex_degree.size(),
+                adj_list.size());
         }
     }
 

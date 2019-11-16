@@ -15,6 +15,7 @@ enum class ScannerType{
     Parallel
 };
 
+/*
 std::ostream& operator<<(std::ostream& out, const ScannerType &value){
     const char* s = 0;
 #define PROCESS_VAL(p) case(p): s = #p; break;
@@ -25,6 +26,7 @@ std::ostream& operator<<(std::ostream& out, const ScannerType &value){
 #undef PROCESS_VAL
     return out << s;
 }
+*/
 
 std::string plainScannerType(ScannerType type) {
     switch(type){
@@ -35,13 +37,14 @@ std::string plainScannerType(ScannerType type) {
         case ScannerType::Parallel:
             return "parallel";
     }
+    return "sequential";
 }
 
 struct Options
 { 
     std::string inFile;
     float eps = 1;
-    int minPts = 10;
+    size_t minPts = 10;
     ScannerType scannerType = ScannerType::Sequential;
 };
 

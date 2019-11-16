@@ -12,7 +12,7 @@ public:
      * -1 stands for noise, 0 for unprocessed, otherwise stands for the cluster id
      */
     size_t scan(
-        std::vector<Vec2> &points, std::vector<int> &labels, float eps, int minPts
+        std::vector<Vec2> &points, std::vector<int> &labels, float eps, size_t minPts
     ){ 
         using std::vector;
 
@@ -23,7 +23,6 @@ public:
 
         size_t counter = 0;  // current number of clusters
         for(size_t i = 0; i < points.size(); i++){
-            auto point = points[i];
             auto label = labels[i];
             // already in a cluster, skip
             if(label > 0) continue;
@@ -45,7 +44,7 @@ private:
                     std::vector<size_t> &adj_list, 
                     std::vector<size_t> &boarder, 
                     int j, 
-                    int minPts, 
+                    size_t minPts, 
                     std::vector<int> &labels, 
                     int counter) {
         if(boarder[j]) {
@@ -82,7 +81,7 @@ private:
             std::vector<size_t> &adj_list, 
             size_t counter, 
             std::vector<int> &labels, 
-            int minPts) {
+            size_t minPts) {
         // TODO: use bit vector
         std::vector<size_t> boarder(vertex_degree.size(), 0);
         boarder[i] = 1;

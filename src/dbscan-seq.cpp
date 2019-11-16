@@ -12,7 +12,7 @@ public:
      * -1 stands for noise, 0 for unprocessed, otherwise stands for the cluster id
      */
     size_t scan(
-        std::vector<Vec2> &points, std::vector<int> &labels, float eps, int minPts
+        std::vector<Vec2> &points, std::vector<int> &labels, float eps, size_t minPts
     ){ 
         using std::vector;
         using std::deque;
