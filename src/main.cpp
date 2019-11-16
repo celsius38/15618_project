@@ -11,6 +11,7 @@
 
 enum class ScannerType{
     Sequential,
+    Seq2,
     Parallel
 };
 
@@ -29,6 +30,8 @@ std::string plainScannerType(ScannerType type) {
     switch(type){
         case ScannerType::Sequential:
             return "sequential";
+        case ScannerType::Seq2: 
+            return "seq2";
         case ScannerType::Parallel:
             return "parallel";
     }
@@ -60,7 +63,9 @@ Options parseOptions(int argc, const char ** argv){
             opt.minPts = (int)atoi(argv[i+1]);
         }else if(strcmp(argv[i], "--seq") == 0){
             opt.scannerType = ScannerType::Sequential;
-        }else if(strcmp(argv[i], "--pal") == 0) {
+        }else if(strcmp(argv[i], "--seq2") == 0) {
+            opt.scannerType = ScannerType::Seq2;
+        }else if(strcmp(argv[i], "--par") == 0) {
             opt.scannerType = ScannerType::Parallel;
         }
     }
@@ -111,8 +116,8 @@ int main(int argc, const char ** argv){
         case ScannerType::Sequential:
             scanner = createSequentialDBScanner();
             break;
-        case ScannerType::Parallel:
-            scanner = createParallelDBScanner();
+        case ScannerType::Seq2:
+            scanner = createSeq2DBScanner();
             break;
     }
     // scan
