@@ -6,6 +6,7 @@
 void bfs_cuda(size_t* boarder, int* labels, int counter, size_t N);
 void setup(size_t* vertex_degree, size_t* vertex_start_index, size_t* adj_list, size_t minPts, size_t N, size_t adj_list_len);
 void degree_cuda(size_t* vertex_degree, float* points_x, float* points_y, float eps, size_t N);
+void adj_list_cuda(size_t* vertex_start_index, size_t* adj_list, float* points_x, float* points_y, float eps, size_t N, size_t adj_list_len);
 
 class ParallelDBScanner: public DBScanner
 {
@@ -69,22 +70,6 @@ private:
         }
     }
 
-    void adj_list_kernel(size_t v, 
-                        std::vector<size_t> &vertex_start_index, 
-                        std::vector<size_t> &adj_list,
-                        std::vector<Vec2> &points, 
-                        float eps) {
-        size_t cur_index = vertex_start_index[v];
-        Vec2 p1 = points[v];
-        for(size_t i = 0; i < points.size(); i++) {
-            Vec2 p2 = points[i];
-            if((p1-p2).length() <= eps){
-                adj_list[cur_index] = i;
-                cur_index++;
-            }
-        }
-    }
-
     std::vector<size_t> costruct_graph(std::vector<size_t> &vertex_degree, 
                                         std::vector<size_t> &vertex_start_index, 
                                         std::vector<Vec2> &points, 
@@ -103,10 +88,7 @@ private:
             cur_index += vertex_degree[v];
         }
         std::vector<size_t> adj_list(cur_index);
-        for(size_t v = 0; v < points.size(); v++) {
-            // TODO: CUDA version removes v
-            adj_list_kernel(v, vertex_start_index, adj_list, points, eps);
-        }
+        adj_list_cuda(vertex_start_index.data(), adj_list.data(), points_x.data(), points_y.data(), eps, points.size(), cur_index);
         return adj_list;
     }
 };

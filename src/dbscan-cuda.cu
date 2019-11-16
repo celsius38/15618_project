@@ -55,6 +55,24 @@ degree_kernel(size_t* vertex_degree, float* points_x, float* points_y, float eps
     }
 }
 
+__global__ void
+adj_list_kernel(size_t* vertex_start_index, size_t* adj_list, float* points_x, float* points_y, float eps, size_t N) {
+    int v = blockIdx.x * blockDim.x + threadIdx.x;
+    if (v < N) {
+        size_t cur_index = vertex_start_index[v];
+        float p1_x = points_x[v];
+        float p1_y = points_y[v];
+        for(size_t i = 0; i < N; i++) {
+            float p2_x = points_x[i];
+            float p2_y = points_y[i];
+            if((p1_x-p2_x)*(p1_x-p2_x) + (p1_y-p2_y)*(p1_y-p2_y) <= eps*eps){
+                adj_list[cur_index] = i;
+                cur_index++;
+            }
+        }
+    }
+}
+
 void setup(size_t* vertex_degree, size_t* vertex_start_index, size_t* adj_list, size_t minPts, size_t N, size_t adj_list_len) {
     int bytes = sizeof(size_t) * N;
     int adj_list_bytes = sizeof(size_t) * adj_list_len;
@@ -139,4 +157,50 @@ void degree_cuda(size_t* vertex_degree, float* points_x, float* points_y, float 
     cudaFree(device_points_y);
 
 }
+
+void adj_list_cuda(size_t* vertex_start_index, size_t* adj_list, float* points_x, float* points_y, float eps, size_t N, size_t adj_list_len) {
+    int bytes_start_index = sizeof(size_t) * N;
+    int bytes_adj_list = sizeof(size_t) * adj_list_len;
+    int bytes_points = sizeof(float) * N;
+
+    // compute number of blocks and threads per block
+    const int threadsPerBlock = 512;
+    const int blocks = (N + threadsPerBlock - 1) / threadsPerBlock;
+
+    size_t* device_start_index;
+    size_t* device_adj_list;
+    float* device_points_x;
+    float* device_points_y;
+
+    cudaMalloc(&device_start_index, bytes_start_index);
+    cudaMalloc(&device_adj_list, bytes_adj_list);
+    cudaMalloc(&device_points_x, bytes_points);
+    cudaMalloc(&device_points_y, bytes_points);
+
+    cudaMemcpy(device_start_index, vertex_start_index, bytes_start_index, cudaMemcpyHostToDevice);
+    cudaMemcpy(device_points_x, points_x, bytes_points, cudaMemcpyHostToDevice);
+    cudaMemcpy(device_points_y, points_y, bytes_points, cudaMemcpyHostToDevice);
+
+    adj_list_kernel<<<blocks, threadsPerBlock>>>(device_start_index, device_adj_list, device_points_x, device_points_y, eps, N);
+
+    cudaThreadSynchronize();
+    cudaMemcpy(adj_list, device_adj_list, bytes_adj_list, cudaMemcpyDeviceToHost);
+
+    cudaFree(device_start_index);
+    cudaFree(device_adj_list);
+    cudaFree(device_points_x);
+    cudaFree(device_points_y);
+}
+
+
+
+
+
+
+
+
+
+
+
+
 
