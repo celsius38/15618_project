@@ -37,6 +37,24 @@ bfs_kernel(size_t* boarder, int* labels, int counter) {
     }
 }
 
+__global__ void
+degree_kernel(size_t* vertex_degree, float* points_x, float* points_y, float eps, size_t N) {
+    int v = blockIdx.x * blockDim.x + threadIdx.x;
+    if (v < N) {
+        size_t degree = 0;
+        float p1_x = points_x[v];
+        float p1_y = points_y[v];
+        for(size_t i = 0; i < N; i++){
+            float p2_x = points_x[i];
+            float p2_y = points_y[i];
+            if((p1_x-p2_x)*(p1_x-p2_x) + (p1_y-p2_y)*(p1_y-p2_y) <= eps*eps){
+                degree++;
+            }
+        }
+        vertex_degree[v] = degree;
+    }
+}
+
 void setup(size_t* vertex_degree, size_t* vertex_start_index, size_t* adj_list, size_t minPts, size_t N, size_t adj_list_len) {
     int bytes = sizeof(size_t) * N;
     int adj_list_bytes = sizeof(size_t) * adj_list_len;
@@ -90,5 +108,35 @@ void bfs_cuda(size_t* boarder, int* labels, int counter, size_t N) {
 
     cudaFree(device_boarder);
     cudaFree(device_labels);
+}
+
+void degree_cuda(size_t* vertex_degree, float* points_x, float* points_y, float eps, size_t N) {
+    int bytes_degree = sizeof(size_t) * N;
+    int bytes_points = sizeof(float) * N;
+
+    // compute number of blocks and threads per block
+    const int threadsPerBlock = 512;
+    const int blocks = (N + threadsPerBlock - 1) / threadsPerBlock;
+
+    size_t* device_degree;
+    float* device_points_x;
+    float* device_points_y;
+
+    cudaMalloc(&device_degree, bytes_degree);
+    cudaMalloc(&device_points_x, bytes_points);
+    cudaMalloc(&device_points_y, bytes_points);
+
+    cudaMemcpy(device_points_x, points_x, bytes_points, cudaMemcpyHostToDevice);
+    cudaMemcpy(device_points_y, points_y, bytes_points, cudaMemcpyHostToDevice);
+
+    degree_kernel<<<blocks, threadsPerBlock>>>(device_degree, device_points_x, device_points_y, eps, N);
+
+    cudaThreadSynchronize();
+    cudaMemcpy(vertex_degree, device_degree, bytes_degree, cudaMemcpyDeviceToHost);
+
+    cudaFree(device_degree);
+    cudaFree(device_points_x);
+    cudaFree(device_points_y);
+
 }
 

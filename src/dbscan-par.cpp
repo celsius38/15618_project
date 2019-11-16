@@ -5,6 +5,7 @@
 
 void bfs_cuda(size_t* boarder, int* labels, int counter, size_t N);
 void setup(size_t* vertex_degree, size_t* vertex_start_index, size_t* adj_list, size_t minPts, size_t N, size_t adj_list_len);
+void degree_cuda(size_t* vertex_degree, float* points_x, float* points_y, float eps, size_t N);
 
 class ParallelDBScanner: public DBScanner
 {
@@ -68,18 +69,6 @@ private:
         }
     }
 
-    void degree_kernel(size_t v, std::vector<size_t> &vertex_degree, std::vector<Vec2> &points, float eps) {
-        size_t degree = 0;
-        Vec2 p1 = points[v];
-        for(size_t i = 0; i < points.size(); i++){
-            Vec2 p2 = points[i];
-            if((p1-p2).length() <= eps){
-                degree++;
-            }
-        }
-        vertex_degree[v] = degree;
-    }
-
     void adj_list_kernel(size_t v, 
                         std::vector<size_t> &vertex_start_index, 
                         std::vector<size_t> &adj_list,
@@ -100,10 +89,13 @@ private:
                                         std::vector<size_t> &vertex_start_index, 
                                         std::vector<Vec2> &points, 
                                         float eps) {
-        for(size_t v = 0; v < points.size(); v++) {
-            // TODO: CUDA version removes v
-            degree_kernel(v, vertex_degree, points, eps);
+        std::vector<float> points_x(points.size());
+        std::vector<float> points_y(points.size());
+        for(size_t i = 0; i < points.size(); i++) {
+            points_x[i] = points[i].x;
+            points_y[i] = points[i].y;
         }
+        degree_cuda(vertex_degree.data(), points_x.data(), points_y.data(), eps, points.size());
         // TODO: exclusive scan
         size_t cur_index = 0;
         for(size_t v = 0; v < points.size(); v++) {
