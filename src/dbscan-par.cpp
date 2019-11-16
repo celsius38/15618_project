@@ -3,15 +3,8 @@
 
 #include "make_unique.h"
 
-void bfs_cuda(size_t* vertex_degree, 
-                size_t* vertex_start_index,
-                size_t* adj_list, 
-                size_t* boarder,  
-                size_t minPts, 
-                int* labels, 
-                int counter,
-                size_t N,
-                size_t adj_list_len);
+void bfs_cuda(size_t* boarder, int* labels, int counter, size_t N);
+void setup(size_t* vertex_degree, size_t* vertex_start_index, size_t* adj_list, size_t minPts, size_t N, size_t adj_list_len);
 
 class ParallelDBScanner: public DBScanner
 {
@@ -29,6 +22,8 @@ public:
         std::vector<size_t> vertex_start_index(points.size());
         std::vector<size_t> adj_list = 
             costruct_graph(vertex_degree, vertex_start_index, points, eps);
+
+        setup(vertex_degree.data(), vertex_start_index.data(), adj_list.data(), minPts, vertex_degree.size(), adj_list.size());
 
         size_t counter = 0;  // current number of clusters
         for(size_t i = 0; i < points.size(); i++){
@@ -69,15 +64,7 @@ private:
         std::vector<size_t> boarder(vertex_degree.size(), 0);
         boarder[i] = 1;
         while(!isEmpty(boarder)) {
-            bfs_cuda(vertex_degree.data(), 
-                vertex_start_index.data(), 
-                adj_list.data(), 
-                boarder.data(), 
-                minPts, 
-                labels.data(), 
-                counter,
-                vertex_degree.size(),
-                adj_list.size());
+            bfs_cuda(boarder.data(), labels.data(), counter, vertex_degree.size());
         }
     }
 
