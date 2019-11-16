@@ -119,6 +119,9 @@ int main(int argc, const char ** argv){
         case ScannerType::Seq2:
             scanner = createSeq2DBScanner();
             break;
+        case ScannerType::Parallel:
+            scanner = createParallelDBScanner();
+            break;
     }
     // scan
     std::vector<int> labels(points.size(), 0);

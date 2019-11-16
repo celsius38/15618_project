@@ -3,8 +3,7 @@
 
 #include "make_unique.h"
 
-// Parallelization friendly sequential DBSCAN
-class Seq2DBScanner: public DBScanner
+class ParallelDBScanner: public DBScanner
 {
 public: 
     /* Return total number of clusters
@@ -145,6 +144,6 @@ private:
     }
 };
 
-std::unique_ptr<DBScanner> createSeq2DBScanner(){
-    return std::make_unique<Seq2DBScanner>();
+std::unique_ptr<DBScanner> createParallelDBScanner(){
+    return std::make_unique<ParallelDBScanner>();
 }
