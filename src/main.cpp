@@ -10,19 +10,29 @@
 #include "dbscan.h"
 
 enum class ScannerType{
-    Sequential
+    Sequential,
+    Parallel
 };
 
 std::ostream& operator<<(std::ostream& out, const ScannerType &value){
     const char* s = 0;
 #define PROCESS_VAL(p) case(p): s = #p; break;
     switch(value){
-        PROCESS_VAL(ScannerType::Sequential);
+        PROCESS_VAL(ScannerType::Parallel);
+
     }
 #undef PROCESS_VAL
     return out << s;
 }
 
+std::string plainScannerType(ScannerType type) {
+    switch(type){
+        case ScannerType::Sequential:
+            return "sequential";
+        case ScannerType::Parallel:
+            return "parallel";
+    }
+}
 
 struct Options
 { 
@@ -48,8 +58,10 @@ Options parseOptions(int argc, const char ** argv){
             opt.eps = (float)atof(argv[i+1]);
         }else if(strcmp(argv[i], "--minPts") == 0){
             opt.minPts = (int)atoi(argv[i+1]);
-        }else if(strcmp(argv[i],"--seq")){
+        }else if(strcmp(argv[i], "--seq") == 0){
             opt.scannerType = ScannerType::Sequential;
+        }else if(strcmp(argv[i], "--pal") == 0) {
+            opt.scannerType = ScannerType::Parallel;
         }
     }
     if(opt.inFile.empty()){
@@ -88,7 +100,7 @@ std::vector<Vec2> loadFromFile(std::string fileName){
 int main(int argc, const char ** argv){
     Options options = parseOptions(argc, argv);
     std::cout << "inFile: " << options.inFile << std::endl;
-    std::cout << "scannerType: " << options.scannerType << std::endl;
+    std::cout << "scannerType: " << plainScannerType(options.scannerType) << std::endl;
     std::cout << "eps: " << options.eps << std::endl;
     std::cout << "minPts: " << options.minPts << std::endl;
     // load points
@@ -98,6 +110,9 @@ int main(int argc, const char ** argv){
     switch(options.scannerType){
         case ScannerType::Sequential:
             scanner = createSequentialDBScanner();
+            break;
+        case ScannerType::Parallel:
+            scanner = createParallelDBScanner();
             break;
     }
     // scan

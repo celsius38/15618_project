@@ -15,7 +15,7 @@ MIN_PTS = 10
 BINARY = "./dbscan-release"
 LOGS_DIR = "logs"
 # TODO: add more scanner types and input files
-SCANNER_TYPES = ["seq"]
+SCANNER_TYPES = ["seq", "pal"]
 IN_FILES = ["src/benchmark-files/" + x for x in 
     [f"{case}-{n}.in"  
         for case in ["random"]  

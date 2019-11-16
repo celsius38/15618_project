@@ -8,7 +8,7 @@ def random(size):
         for x,y in zip(xs,ys):
             f.write("{} {}\n".format(x,y))
         points = np.array([xs,ys]).T
-        clustering
+        # clustering
 
 def mixture(size):
     with open("mixture-{}.in".format(size), 'w') as f:
