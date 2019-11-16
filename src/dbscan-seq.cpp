@@ -58,7 +58,8 @@ private:
         for(size_t i = 0; i < points.size(); i++){
             Vec2 p1 = points[i];
             std::vector<size_t> &p1_neighbors = neighbors[i];
-            for(size_t j = i; j < points.size(); j++){
+            p1_neighbors.push_back(i);  // neighbors include the point itself
+            for(size_t j = i+1; j < points.size(); j++){
                 Vec2 p2 = points[j];
                 std::vector<size_t> &p2_neighbors = neighbors[j];
                 if((p1-p2).length() <= eps){

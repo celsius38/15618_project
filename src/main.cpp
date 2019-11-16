@@ -105,8 +105,8 @@ int main(int argc, const char ** argv){
     double start = CycleTimer::currentMSeconds(); 
     size_t numClusters = scanner->scan(points, labels, options.eps, options.minPts);
     std::cout << "Taking " << CycleTimer::currentMSeconds()-start << " ms"<< std::endl;
-    std::cout << "=====================" << std::endl;
-    std::cout << numClusters << " Clusters" << std::endl; 
+    std::cout << "====================" << std::endl;
+    std::cout << numClusters << " clusters" << std::endl; 
     for(auto label: labels){
         std::cout << label << std::endl;
     }
