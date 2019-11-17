@@ -1,7 +1,8 @@
 #include <cuda.h>
 #include <cuda_runtime.h>
 #include <driver_functions.h>
-
+#include <thrust/scan.h>
+#include <thrust/device_ptr.h>
 
 struct GlobalConstants {
     size_t* vertex_degree;
@@ -190,6 +191,20 @@ void adj_list_cuda(size_t* vertex_start_index, size_t* adj_list, float* points_x
     cudaFree(device_adj_list);
     cudaFree(device_points_x);
     cudaFree(device_points_y);
+}
+
+void start_index_cuda(size_t* vertex_start_index, size_t N) {
+    int bytes = sizeof(size_t) * N;
+    size_t* device_start_index;
+    
+    cudaMalloc(&device_start_index, bytes);
+    cudaMemcpy(device_start_index, vertex_start_index, bytes, cudaMemcpyHostToDevice);
+
+    thrust::device_ptr<size_t> device_start_index_ptr = thrust::device_pointer_cast(device_start_index);
+    thrust::exclusive_scan(device_start_index_ptr, device_start_index_ptr + N, device_start_index_ptr);
+
+    cudaMemcpy(vertex_start_index, device_start_index, bytes, cudaMemcpyDeviceToHost);
+    cudaFree(device_start_index);
 }
 
 
