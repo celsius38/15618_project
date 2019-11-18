@@ -91,7 +91,7 @@ def dbscan_ref(in_file:str, eps:float, min_pts:int) -> ScanResult:
     MS_PER_S = 1e3
     points = np.loadtxt(in_file)
     start = time.time()
-    clustering = DBSCAN(eps=eps, min_samples=min_pts).fit(points)
+    clustering = DBSCAN(eps=eps, min_samples=min_pts, n_jobs=-1).fit(points)
     labels = clustering.labels_
     num_clusters = len(set(labels)) - (1 if -1 in labels else 0)
     return ScanResult(
