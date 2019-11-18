@@ -1,20 +1,12 @@
 # Project Checkpoint(Nov.18th)
+## Summary
 
-## Updated Schedule
-So far, we have kept pace with the planned schedule. Specifically, we now have a working version of sequential version, a G-DBSCAN and the python `sklearn` package implementation as reference
-
-| Week| Goal| Detail|
-|-----|-----|-------|
-| Week 1(10/29-11/05) | Research | <ul> <li>- [x] Write proposal, read related paper and implement sequential version. </li> </ul> |
-| Week 2(11/05-11/12) | 1st Parallel Implementation        | <ul> <li>-[x] Implement G-DBSCAN with CUDA and do analysis.</li></ul> |
-| Week 3(11/12-11/19) | Checkpoint!         | <ul><li>-[x] Check point report</li> </ul>|
-| Week 4(11/19-11/26) | G-DBSCAN speed <br> MPI version draft                       |  <ul><li>-[] N-Body data-parallel approach to neighbor construction (Sailun) </li> <li>-[] K-D tree approach to neighbor construction(Yueni)</li> </li><li>-[] Drafting MPI approach to RP-DBSCAN(both) </li></ul>               |
-| Week 5(11/26-12/03) | MPI version finalize <br> Performance analysis               | <ul><li>-[] Implement full RP-DBSCAN with MPI and all relevant tricks(Sailun) </li><li>-[] Fine tune each algorithm and optimize the relevant hyperparameters(Yuenil) </li><li>-[] Design more test cases, and anlyze the effect of ![equation](https://latex.codecogs.com/gif.latex?%5Cepsilon) and `minPts` on different algorithms(Yueni)  </li></ul>|
-| Week 6(12/03-12/10) | Final Report <br> Poster <br>  | <ul><li>-[] Run a grid of experiments setting configurations, and draw graphs for comparison (both) </li> <li>-[] Final report (both) </li> <li>-[] Poster(both) </li></ul> |
-
+We are going to implement and optimize a density-based clustering algorithm [dbscan] on both GPU (CUDA) and distributed memory (MPI), and perform a detailed analysis and comparison on various datasets.
 
 ## Background
+
 DBSCAN is a density-based clustering algorithm. Each object is either `core`, `border` or `noise` as shown in the graph below. The algorithm has two parameters, `R` the proximity radius, and `MinPts` the minimum number of neighbors. For any given object `o`, we define all objects that are at most `R` distance (Euclidean) away its `neightbors`. If a given objects has more `neighbors` than `MinPts`, then it is defined as `core` and all objects reachable directly or indirectly from it is defined as `border` and they are within the same cluster. If the object is not reachable from any `core`, then it is defined as `noise`. 
+
 
 <div style="text-align:center"><img src ="image/dbscan.png" /></div>
 
@@ -25,6 +17,7 @@ This problem could be benefitting from parallelism in the following ways:
 
 * The process of finding the `neighbors` (`GetNeighbors`) for each object could benefit from parallelism
 * The process of traversing all the objects within a cluster could benfit from parallelism
+
 
 There have been many efforts parallelizing the algorithm after the seminal paper [DBSCAN], like [G-DBSCAN], [MR-DBSCAN], [RP-DBSCAN], etc. However, we notice that these algorithms either still have some space for parallelism or cache optimization or are designed for Map-Reduce. Therefore, in this project, we will be focusing on a graph-based implementation using GPU and MPI by borrowing some key ideas from these papers while exploit parallelism/cache optimization opportunities that might be missing from these papers. 
 
