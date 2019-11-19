@@ -1,4 +1,5 @@
 # Project Checkpoint(Nov.18th)
+[Link to the project page](https://celsius38.github.io/15618_project/)
 
 ## Updated Schedule
 So far, we have kept pace with the planned schedule. Specifically, we now have a working version of sequential version, a G-DBSCAN and the python `sklearn` package implementation as reference
