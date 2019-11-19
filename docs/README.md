@@ -3,20 +3,20 @@
 ## Updated Schedule
 So far, we have kept pace with the planned schedule. Specifically, we now have a working version of sequential version, a G-DBSCAN and the python `sklearn` package implementation as reference
 
-| Week| Goal| Detail|
-|-----|-----|-------|
-| Week 1(10/29-11/05) | Research | <ul> <li>- [x] Write proposal, read related paper and implement sequential version. </li> </ul> |
-| Week 2(11/05-11/12) | 1st Parallel Implementation        | <ul> <li>- [x] Implement G-DBSCAN with CUDA and do analysis.</li></ul> |
-| Week 3(11/12-11/19) | Checkpoint!         | <ul><li>- [x] Check point report</li> </ul>|
-| Week 4(11/19-11/26) | G-DBSCAN speed <br> MPI version draft                       |  <ul><li>- [ ] N-Body data-parallel approach to neighbor construction (Sailun) </li> <li>- [ ] K-D tree approach to neighbor construction(Yueni)</li> </li><li>- [ ] Drafting MPI approach to RP-DBSCAN(both) </li></ul>               |
-| Week 5(11/26-12/03) | MPI version finalize <br> Performance analysis               | <ul><li>- [ ] Implement full [RP-DBSCAN] with MPI and all relevant tricks(Sailun) </li><li>- [ ] Fine tune each algorithm and optimize the relevant hyperparameters(Yuenil) </li><li>- [ ] Design more test cases, and anlyze the effect of $\epsilon$ and `minPts` on different algorithms(Yueni)  </li></ul>|
-| Week 6(12/03-12/10) | Final Report <br> Poster <br>  | <ul><li>- [ ] Run a grid of experiments setting configurations, and draw graphs for comparison (both) </li> <li>- [ ] Final report (both) </li> <li>- [ ] Poster(both) </li></ul> |
+| Week| Goal| Detail| Progress|
+|-----|-----|-------|---------|
+| Week 1(10/29-11/05) | Research | Write proposal, read related paper and implement sequential version. | Done |
+| Week 2(11/05-11/12) | 1st Parallel Implementation        | Implement G-DBSCAN with CUDA and do analysis. | Done |
+| Week 3(11/12-11/19) | Checkpoint!         | Check point report | Done |
+| Week 4(11/19-11/26) | G-DBSCAN speed & <br> MPI version draft                       |  1. N-Body data-parallel approach to neighbor construction (Sailun) <br> 2. K-D tree approach to neighbor construction(Yueni) <br> 3. Drafting MPI approach to RP-DBSCAN(both)               | TODO |
+| Week 5(11/26-12/03) | MPI version finalize & <br> Performance analysis               | 1. Implement full [RP-DBSCAN] with MPI and all relevant tricks(Sailun) <br> 2. Fine tune each algorithm and optimize the relevant hyperparameters(Yuenil) <br> 3. Design more test cases, and anlyze the effect of `epsilon` and `minPts` on different algorithms(Yueni) | TODO |
+| Week 6(12/03-12/10) | Final Report <br> Poster <br>  | 1. Run a grid of experiments setting configurations, and draw graphs for comparison (both) <br> 2. Final report (both) <br> 3. Poster(both) | TODO |
 
 
 
 As mentioned before, we have so far kept pace with the planned schedule, but largely due to that all algorithms we have implemented so far are on the relatively easy side, and the true challenge will be [RP-DBSCAN] and we expect to spend roughly two weeks on that. Also, we expect to improve the [G-DBSCAN] by using either the k-d tree or the N-Body data-parallel approach mentioned in the lecture.
 
-For the poster session: we plan to breif our approach to the problem, the optimizations/tricks we have used throughout the implementation and compare the run-time between different scan algorithms on different patterns with various sizes by showing multiple graphs.
+For the poster session: we plan to explain our approach to the problem, and the optimizations/tricks we have used throughout the implementation. We will also show graphs which compare the various aspects (speedup, time breakdown, load balance, scalability, and memory footprint) of different scan algorithms on different scenario.
 
 
 
@@ -24,12 +24,12 @@ For the poster session: we plan to breif our approach to the problem, the optimi
 We start from scratch and build a workflow of:   
 
 * implementing a new scan algorithm class that inherits the pure virtual base class `DBScanner`, so far we have built:
-	* `SequentialDBScanner`: a naive implementation where we build `neighbors` by going through every pair of points (a complexity of $O(n^2)$), then we simply find all connected parts by performing BFS
-	* `Seq2DBScanner`: a sequential version of the algorithm mentioned in [G-DBSCAN], notably, it performs worse than the `SequentialDBScanner`.
-	* `ParallelDBScanner`: a cuda version of the [G-DBSCAN], which includes exclusive scan for constructing the neighbor graph, and GPU BFS
-	* `RefScanner`: basically we invoke the `sklearn.cluster.DBSCAN`. For reference, this version includes a k-d tree for building `neighbors` faster ($O(n^2)$ on average, and $O(n\log n)$ empirically). Also, the BFS procedure is optimized using `Cython` (`c` extension for `python`).
+	* `SequentialDBScanner`: a naive implementation where we build `neighbors` by going through every pair of points (a complexity of `O(n^2)`), then we simply find all connected parts by performing BFS
+	* `Seq2DBScanner`: a sequential version of the algorithm mentioned in [G-DBSCAN], notably, it performs worse than the `SequentialDBScanner` for seeking the possibility of parallelization.
+	* `ParallelDBScanner`: a cuda version of the [G-DBSCAN], which utilizes a compact adjacency list to represente the graph. Both graph construction (exlusive scan with Thrust library) and cluster identification (BFS with level synchronization) is parallized. 
+	* `RefScanner`: basically we invoke the `sklearn.cluster.DBSCAN`. For reference, this version includes a k-d tree for building `neighbors` faster (`O(n^2)` on average, and `O(n\log n)` empirically). Also, the BFS procedure is optimized using `Cython` (`c` extension for `python`).
 * including a new test case with different number of points and scatter pattern, so far we have the following test cases:
-	* `random-{k}` where $k \in \{1e3, 1e4, 1e5, 1e6\}$, we sample uniformly randomly from the $[-10,10] \times [-10, 10]$
+	* `random-{k}` where `k` in `{1e3, 1e4, 1e5, 1e6}`, we sample uniformly randomly from the `([-10,10], [-10, 10])`.
 	We are expecting to build more test cases such as `ring`, `mixture`, but so far we only use the random case for testing the correctness by checking the output labels of our scanner against the `RefScanner`.
 
 The following is a summary of the runtime (in `ms`) of each of the combination of (`scannerType`, `testCase`):
