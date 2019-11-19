@@ -27,7 +27,7 @@ We start from scratch and build a workflow of:
 	* `SequentialDBScanner`: a naive implementation where we build `neighbors` by going through every pair of points (a complexity of `O(n^2)`), then we simply find all connected parts by performing BFS
 	* `Seq2DBScanner`: a sequential version of the algorithm mentioned in [G-DBSCAN], notably, it performs worse than the `SequentialDBScanner` for seeking the possibility of parallelization.
 	* `ParallelDBScanner`: a cuda version of the [G-DBSCAN], which utilizes a compact adjacency list to represente the graph. Both graph construction (exlusive scan with Thrust library) and cluster identification (BFS with level synchronization) is parallized. 
-	* `RefScanner`: basically we invoke the `sklearn.cluster.DBSCAN`. For reference, this version includes a k-d tree for building `neighbors` faster (`O(n^2)` on average, and `O(n\log n)` empirically). Also, the BFS procedure is optimized using `Cython` (`c` extension for `python`).
+	* `RefScanner`: basically we invoke the `sklearn.cluster.DBSCAN`. For reference, this version includes a k-d tree for building `neighbors` faster (`O(n^2)` on average, and `O(n*log n)` empirically). Also, the BFS procedure is optimized using `Cython` (`c` extension for `python`).
 * including a new test case with different number of points and scatter pattern, so far we have the following test cases:
 	* `random-{k}` where `k` in `{1e3, 1e4, 1e5, 1e6}`, we sample uniformly randomly from the `([-10,10], [-10, 10])`.
 	We are expecting to build more test cases such as `ring`, `mixture`, but so far we only use the random case for testing the correctness by checking the output labels of our scanner against the `RefScanner`.
