@@ -9,73 +9,39 @@ So far, we have kept pace with the planned schedule. Specifically, we now have a
 | Week 2(11/05-11/12) | 1st Parallel Implementation        | <ul> <li>- [x] Implement G-DBSCAN with CUDA and do analysis.</li></ul> |
 | Week 3(11/12-11/19) | Checkpoint!         | <ul><li>- [x] Check point report</li> </ul>|
 | Week 4(11/19-11/26) | G-DBSCAN speed <br> MPI version draft                       |  <ul><li>- [ ] N-Body data-parallel approach to neighbor construction (Sailun) </li> <li>- [ ] K-D tree approach to neighbor construction(Yueni)</li> </li><li>- [ ] Drafting MPI approach to RP-DBSCAN(both) </li></ul>               |
-| Week 5(11/26-12/03) | MPI version finalize <br> Performance analysis               | <ul><li>- [ ] Implement full RP-DBSCAN with MPI and all relevant tricks(Sailun) </li><li>- [ ] Fine tune each algorithm and optimize the relevant hyperparameters(Yuenil) </li><li>- [ ] Design more test cases, and anlyze the effect of ![equation](https://latex.codecogs.com/gif.latex?%5Cepsilon) and `minPts` on different algorithms(Yueni)  </li></ul>|
+| Week 5(11/26-12/03) | MPI version finalize <br> Performance analysis               | <ul><li>- [ ] Implement full [RP-DBSCAN] with MPI and all relevant tricks(Sailun) </li><li>- [ ] Fine tune each algorithm and optimize the relevant hyperparameters(Yuenil) </li><li>- [ ] Design more test cases, and anlyze the effect of $\epsilon$ and `minPts` on different algorithms(Yueni)  </li></ul>|
 | Week 6(12/03-12/10) | Final Report <br> Poster <br>  | <ul><li>- [ ] Run a grid of experiments setting configurations, and draw graphs for comparison (both) </li> <li>- [ ] Final report (both) </li> <li>- [ ] Poster(both) </li></ul> |
 
 
-## Background
-DBSCAN is a density-based clustering algorithm. Each object is either `core`, `border` or `noise` as shown in the graph below. The algorithm has two parameters, `R` the proximity radius, and `MinPts` the minimum number of neighbors. For any given object `o`, we define all objects that are at most `R` distance (Euclidean) away its `neightbors`. If a given objects has more `neighbors` than `MinPts`, then it is defined as `core` and all objects reachable directly or indirectly from it is defined as `border` and they are within the same cluster. If the object is not reachable from any `core`, then it is defined as `noise`. 
 
-<div style="text-align:center"><img src ="image/dbscan.png" /></div>
+As mentioned before, we have so far kept pace with the planned schedule, but largely due to that all algorithms we have implemented so far are on the relatively easy side, and the true challenge will be [RP-DBSCAN] and we expect to spend roughly two weeks on that. Also, we expect to improve the [G-DBSCAN] by using either the k-d tree or the N-Body data-parallel approach mentioned in the lecture.
 
-Below is the pseudo-code for DBSCAN:
-<div style="text-align:center"><img src ="image/dbscan_pseudo.png" /></div>
-
-This problem could be benefitting from parallelism in the following ways:
-
-* The process of finding the `neighbors` (`GetNeighbors`) for each object could benefit from parallelism
-* The process of traversing all the objects within a cluster could benfit from parallelism
-
-There have been many efforts parallelizing the algorithm after the seminal paper [DBSCAN], like [G-DBSCAN], [MR-DBSCAN], [RP-DBSCAN], etc. However, we notice that these algorithms either still have some space for parallelism or cache optimization or are designed for Map-Reduce. Therefore, in this project, we will be focusing on a graph-based implementation using GPU and MPI by borrowing some key ideas from these papers while exploit parallelism/cache optimization opportunities that might be missing from these papers. 
+For the poster session: we plan to breif our approach to the problem, the optimizations/tricks we have used throughout the implementation and compare the run-time between different scan algorithms on different patterns with various sizes by showing multiple graphs.
 
 
-## Challenge
-Parallelization is not trivial for clustering algorithm since it exhibits inherent sequential data access order, namely, the cluster is expanded in BFS manner, so that points at higher level cannot be explored until the lower level points are exhausted. Although there is no dependency for points at the same level, level synchronization is still required and limit the performance. We’ll explore the work around method in this project.
 
-Large graph can not fit into cache/memory, so we should try to avoid random access as much as possible. We plan to restructure graph data structure so that most data access is contiguous or reusable. We will also explore graph compression and other techniques.
+## Preliminary Result and Issues
+We start from scratch and build a workflow of:   
 
- Work balance requires special attention as well, especially in skewed data set where cluster size diverse a lot.
+* implementing a new scan algorithm class that inherits the pure virtual base class `DBScanner`, so far we have built:
+	* `SequentialDBScanner`: a naive implementation where we build `neighbors` by going through every pair of points (a complexity of $O(n^2)$), then we simply find all connected parts by performing BFS
+	* `Seq2DBScanner`: a sequential version of the algorithm mentioned in [G-DBSCAN], notably, it performs worse than the `SequentialDBScanner`.
+	* `ParallelDBScanner`: a cuda version of the [G-DBSCAN], which includes exclusive scan for constructing the neighbor graph, and GPU BFS
+	* `RefScanner`: basically we invoke the `sklearn.cluster.DBSCAN`. For reference, this version includes a k-d tree for building `neighbors` faster ($O(n^2)$ on average, and $O(n\log n)$ empirically). Also, the BFS procedure is optimized using `Cython` (`c` extension for `python`).
+* including a new test case with different number of points and scatter pattern, so far we have the following test cases:
+	* `random-{k}` where $k \in \{1e3, 1e4, 1e5, 1e6\}$, we sample uniformly randomly from the $[-10,10] \times [-10, 10]$
+	We are expecting to build more test cases such as `ring`, `mixture`, but so far we only use the random case for testing the correctness by checking the output labels of our scanner against the `RefScanner`.
 
-Shared memory is essential in many parallel clustering algorithm, how to adapt these algorithm for cluster of machines without heavy communication overhead is also a challenge.
+The following is a summary of the runtime (in `ms`) of each of the combination of (`scannerType`, `testCase`):
 
+|   |RefScanner | ParallelDBScanner | SequentialScanner | Seq2DBScanner |
+|---|-----|-----|-----|------|    
+|random-1000|12.661934| 1020.34|**4.78667**|12.2835|
+|random-10000|**115.019083**|139.35|206.94000|454.4650|
+|random-100000.in|3408.552885|**468.22**|13815.60000|40600.5000|
 
-## Resources
-We will use both GHC machines and Lateday clusters.
-
-We will use [G-DBSCAN] as our starting point and implement the algorithm from scratch before optimizing it.
-
-For the purpose of performance analysis, we will use the datasets (100, 000 points each) applied by the original DBSCAN paper as shown in the graph below. 
-
-<div style="text-align:center"><img src ="image/cluster_type.png" /></div>
-
-We will also use real-life datasets such as OpenStreetMap (GPS data), Cosmo50 (N-body simulation data), and TeraClickLog (click log data).
-
-## Goals and Deliverables
-Must achieve: optimize existing parallel DBSCAN with CUDA on single GHC machine (expected speedup by 50x over sequential version, and 5x over other parallel implementation).
-
-Plan to achieve: reduce communication cost and adapted the algorithm to distributed memory machines with MPI.
-
-Hope to achieve: experiments on different datasets especially extremely large one that can not be fit in memory.
-
-What to demonstrate: this project is more research oriented instead of application oriented, so there won’t be an interactive demo. We are able to show the clustering results on real-life datasets such as OpenStreetMap and Cosmo50. We’ll also show performance analysis graphs including speedup, time breakdown, load balance, scalability to the number of thread/nodes, and memory footprint. 
-
-Another aspect we could learn from this project: as some of the papers we will be looking at are written in map-reduce, we could look at the pros and cons of map-reduce programming model versus message passing/data parallel model which we will be using.
-
-## Platform choice
-The algorithm G-DBSCAN we chose as a starting point is targeting for GPU, so it’s better if we do optimization on the same platform for performance comparison. However, the size of dataset has been growing rapidly in real life, so that a single machine can not meet the requirement in most cases. So it’s meaningful and necessary to be able to efficiently run clustering algorithm on distributed machines. That’s why we also plan to adapt the algorithm for message passing model running on a cluster of machines. 
-
-
-## Schedule
-
-| Week| Goal| Detail|
-|-----|-----|-------|
-| Week 1(10/29-11/05) | Research | Write proposal, read related paper and implement sequential version. |
-| Week 2(11/05-11/12) | 1st Parallel Implementation        | Implement G-DBSCAN with CUDA and do analysis.                        |
-| Week 3(11/12-11/19) | Optimization (Checkpoint!)         | Conduct optimization and write checkpoint report.                    |
-| Week 4(11/19-11/26) | MPI Version                        | Improve and implement MPI version running on cluster.                |
-| Week 5(11/26-12/03) | Performance analysis               | Run experiments on different datasets and draw graphs.               |
-| Week 6(12/03-12/10) | Wrap up (Final report and poster!) | Run more experiments and prepare final report and poster.            |
-
+Due to the small overhead, `SequentialScanner` performs the best for 1000 points, but `RefScanner` and `ParallelDBScanner` performs better on larger problems. Yet we have not include either the k-d tree/N-body data-parallel approach to speed up the `neighbors` construction yet, we expect that to bring even more advantage for `ParallelDBScanner` and set a strong baseline.  
+Also we notice a dubious large runtime for `ParallelDBScanner` on `random-1000`, we will further look into it this week.
 
 ## References
 
