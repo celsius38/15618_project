@@ -1,8 +1,14 @@
+#include <memory>
+#include "dbscan.h"
+
 #include <cuda.h>
 #include <cuda_runtime.h>
 #include <driver_functions.h>
 #include <thrust/scan.h>
 #include <thrust/device_ptr.h>
+
+///#include "make_unique.h"
+
 
 struct GlobalConstants {
     size_t* vertex_degree;
@@ -13,6 +19,7 @@ struct GlobalConstants {
 };
 
 __constant__ GlobalConstants cuConstParams;
+
 
 __global__ void
 bfs_kernel(size_t* boarder, int* labels, int counter) {
@@ -38,6 +45,7 @@ bfs_kernel(size_t* boarder, int* labels, int counter) {
     }
 }
 
+
 __global__ void
 degree_kernel(size_t* vertex_degree, float* points_x, float* points_y, float eps, size_t N) {
     int v = blockIdx.x * blockDim.x + threadIdx.x;
@@ -55,6 +63,7 @@ degree_kernel(size_t* vertex_degree, float* points_x, float* points_y, float eps
         vertex_degree[v] = degree;
     }
 }
+
 
 __global__ void
 adj_list_kernel(size_t* vertex_start_index, size_t* adj_list, float* points_x, float* points_y, float eps, size_t N) {
@@ -74,37 +83,158 @@ adj_list_kernel(size_t* vertex_start_index, size_t* adj_list, float* points_x, f
     }
 }
 
-void setup(size_t* vertex_degree, size_t* vertex_start_index, size_t* adj_list, size_t minPts, size_t N, size_t adj_list_len) {
-    int bytes = sizeof(size_t) * N;
-    int adj_list_bytes = sizeof(size_t) * adj_list_len;
 
-    size_t* device_degree;
-    size_t* device_start_index;
-    size_t* device_adj_list;
+class ParallelDBScanner: public DBScanner
+{
+public: 
+    /* Return total number of clusters
+     * insert corresponding cluster id in `labels`
+     * -1 stands for noise, 0 for unprocessed, otherwise stands for the cluster id
+     */
+    size_t scan(
+        std::vector<Vec2> &points, std::vector<int> &labels, float eps, size_t minPts
+    ){ 
+        using std::vector;
 
-    cudaMalloc(&device_degree, bytes);
-    cudaMalloc(&device_start_index, bytes);
-    cudaMalloc(&device_adj_list, adj_list_bytes);
+        std::vector<size_t> vertex_degree(points.size());
+        std::vector<size_t> vertex_start_index(points.size());
+        std::vector<size_t> adj_list = 
+            construct_graph(vertex_degree, vertex_start_index, points, eps);
 
-    cudaMemcpy(device_degree, vertex_degree, bytes, cudaMemcpyHostToDevice);
-    cudaMemcpy(device_start_index, vertex_start_index, bytes, cudaMemcpyHostToDevice);
-    cudaMemcpy(device_adj_list, adj_list, adj_list_bytes, cudaMemcpyHostToDevice);
+        setup(vertex_degree.data(), vertex_start_index.data(), adj_list.data(), minPts, vertex_degree.size(), adj_list.size());
 
-    GlobalConstants params;
-    params.vertex_degree = device_degree;
-    params.vertex_start_index = device_start_index;
-    params.adj_list = device_adj_list;
-    params.minPts = minPts;
-    params.N = N;
+        size_t counter = 0;  // current number of clusters
+        for(size_t i = 0; i < points.size(); i++){
+            int label = labels[i];
+            // already in a cluster, skip
+            if(label > 0) continue;
+            // noise
+            if(vertex_degree[i] < minPts) {
+                labels[i] = -1;
+                continue;
+            }
+            counter++;
+            // BFS
+            bfs(i, vertex_degree, vertex_start_index, adj_list, counter, labels, minPts);
+        }
+        return counter;
+    }
 
-    cudaMemcpyToSymbol(cuConstParams, &params, sizeof(GlobalConstants));
-}
+private:
+    void setup(size_t* vertex_degree, size_t* vertex_start_index, size_t* adj_list, 
+                size_t minPts, size_t N, size_t adj_list_len);
+    
+    bool isEmpty(std::vector<size_t> boarder);
+
+    void bfs(size_t i, 
+            std::vector<size_t> &vertex_degree, 
+            std::vector<size_t> &vertex_start_index,
+            std::vector<size_t> &adj_list, 
+            size_t counter, 
+            std::vector<int> &labels, 
+            size_t minPts);
+
+    std::vector<size_t> construct_graph(std::vector<size_t> &vertex_degree, 
+                                        std::vector<size_t> &vertex_start_index, 
+                                        std::vector<Vec2> &points, 
+                                        float eps);
+
+    void bfs_cuda(size_t* boarder, int* labels, int counter, size_t N);
+
+    void degree_cuda(size_t* vertex_degree, float* points_x, float* points_y, float eps, size_t N);
+
+    void adj_list_cuda(size_t* vertex_start_index, size_t* adj_list, float* points_x, float* points_y, float eps, size_t N, size_t adj_list_len);
+
+    void start_index_cuda(size_t* vertex_start_index, size_t N);
+
+};
+
 
 // TODO: cudaFree GlobalConstants
+void 
+ParallelDBScanner::setup(size_t* vertex_degree, size_t* vertex_start_index, size_t* adj_list, size_t minPts, size_t N, size_t adj_list_len) {
+        int bytes = sizeof(size_t) * N;
+        int adj_list_bytes = sizeof(size_t) * adj_list_len;
 
-void bfs_cuda(size_t* boarder, int* labels, int counter, size_t N) {
+        size_t* device_degree;
+        size_t* device_start_index;
+        size_t* device_adj_list;
+
+        cudaMalloc(&device_degree, bytes);
+        cudaMalloc(&device_start_index, bytes);
+        cudaMalloc(&device_adj_list, adj_list_bytes);
+
+        cudaMemcpy(device_degree, vertex_degree, bytes, cudaMemcpyHostToDevice);
+        cudaMemcpy(device_start_index, vertex_start_index, bytes, cudaMemcpyHostToDevice);
+        cudaMemcpy(device_adj_list, adj_list, adj_list_bytes, cudaMemcpyHostToDevice);
+
+        GlobalConstants params;
+        params.vertex_degree = device_degree;
+        params.vertex_start_index = device_start_index;
+        params.adj_list = device_adj_list;
+        params.minPts = minPts;
+        params.N = N;
+
+        cudaMemcpyToSymbol(cuConstParams, &params, sizeof(GlobalConstants));
+}
+
+
+bool 
+ParallelDBScanner::isEmpty(std::vector<size_t> boarder) {
+    for(size_t i = 0; i < boarder.size(); i++) {
+        if(boarder[i]) {
+            return false;
+        }
+    }
+    return true;
+}
+
+
+void 
+ParallelDBScanner::bfs(size_t i, 
+        std::vector<size_t> &vertex_degree, 
+        std::vector<size_t> &vertex_start_index,
+        std::vector<size_t> &adj_list, 
+        size_t counter, 
+        std::vector<int> &labels, 
+        size_t minPts) {
+    // TODO: use bit vector
+    std::vector<size_t> boarder(vertex_degree.size(), 0);
+    boarder[i] = 1;
+    while(!isEmpty(boarder)) {
+        bfs_cuda(boarder.data(), labels.data(), counter, vertex_degree.size());
+    }
+}
+
+
+
+std::vector<size_t> 
+ParallelDBScanner::construct_graph(std::vector<size_t> &vertex_degree, 
+                                    std::vector<size_t> &vertex_start_index, 
+                                    std::vector<Vec2> &points, 
+                                    float eps) {
+    std::vector<float> points_x(points.size());
+    std::vector<float> points_y(points.size());
+    for(size_t i = 0; i < points.size(); i++) {
+        points_x[i] = points[i].x;
+        points_y[i] = points[i].y;
+    }
+    degree_cuda(vertex_degree.data(), points_x.data(), points_y.data(), eps, points.size());
+
+    vertex_start_index = vertex_degree;
+    start_index_cuda(vertex_start_index.data(), points.size());
+    size_t cur_index = vertex_start_index[points.size()-1] + vertex_degree[points.size()-1];
+
+    std::vector<size_t> adj_list(cur_index);
+    adj_list_cuda(vertex_start_index.data(), adj_list.data(), points_x.data(), points_y.data(), eps, points.size(), cur_index);
+    return adj_list;
+}
+
+
+void 
+ParallelDBScanner::bfs_cuda(size_t* boarder, int* labels, int counter, size_t N) {
     int bytes = sizeof(size_t) * N;
-	int labels_byte = sizeof(int) * N;
+    int labels_byte = sizeof(int) * N;
 
     // compute number of blocks and threads per block
     const int threadsPerBlock = 512;
@@ -129,7 +259,9 @@ void bfs_cuda(size_t* boarder, int* labels, int counter, size_t N) {
     cudaFree(device_labels);
 }
 
-void degree_cuda(size_t* vertex_degree, float* points_x, float* points_y, float eps, size_t N) {
+
+void 
+ParallelDBScanner::degree_cuda(size_t* vertex_degree, float* points_x, float* points_y, float eps, size_t N) {
     int bytes_degree = sizeof(size_t) * N;
     int bytes_points = sizeof(float) * N;
 
@@ -159,7 +291,9 @@ void degree_cuda(size_t* vertex_degree, float* points_x, float* points_y, float 
 
 }
 
-void adj_list_cuda(size_t* vertex_start_index, size_t* adj_list, float* points_x, float* points_y, float eps, size_t N, size_t adj_list_len) {
+
+void 
+ParallelDBScanner::adj_list_cuda(size_t* vertex_start_index, size_t* adj_list, float* points_x, float* points_y, float eps, size_t N, size_t adj_list_len) {
     int bytes_start_index = sizeof(size_t) * N;
     int bytes_adj_list = sizeof(size_t) * adj_list_len;
     int bytes_points = sizeof(float) * N;
@@ -193,7 +327,9 @@ void adj_list_cuda(size_t* vertex_start_index, size_t* adj_list, float* points_x
     cudaFree(device_points_y);
 }
 
-void start_index_cuda(size_t* vertex_start_index, size_t N) {
+
+void 
+ParallelDBScanner::start_index_cuda(size_t* vertex_start_index, size_t N) {
     int bytes = sizeof(size_t) * N;
     size_t* device_start_index;
     
@@ -207,15 +343,8 @@ void start_index_cuda(size_t* vertex_start_index, size_t N) {
     cudaFree(device_start_index);
 }
 
-
-
-
-
-
-
-
-
-
-
+std::unique_ptr<DBScanner> createParallelDBScanner(){
+    return std::make_unique<ParallelDBScanner>();
+}
 
 
