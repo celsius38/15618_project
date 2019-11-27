@@ -9,7 +9,10 @@ class Vec2
 {
 public:
     float x, y;
-    Vec2() = default;
+    Vec2(){
+        x = 0.;
+        y = 0.;
+    }
     Vec2(float vx, float vy)
     {
         x = vx;

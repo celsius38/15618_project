@@ -11,7 +11,7 @@ LDFLAGS=-L/usr/local/depot/cuda-8.0/lib64/ -lcudart
 NVCC=nvcc
 NVCCFLAGS=-O3 -m64 --gpu-architecture compute_35
 
-OBJS=$(OBJDIR)/main.o $(OBJDIR)/dbscan-seq.o $(OBJDIR)/dbscan-seq2.o $(OBJDIR)/dbscan-par.o $(OBJDIR)/dbscan-cuda.o
+OBJS=$(OBJDIR)/main.o $(OBJDIR)/dbscan-seq.o $(OBJDIR)/dbscan-seq2.o $(OBJDIR)/gdbscan.o $(OBJDIR)/dbscan-cuda.o
 
 .PHONY: dirs clean
 

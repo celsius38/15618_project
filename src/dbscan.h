@@ -3,7 +3,6 @@
 
 #include <vector>
 #include <memory>
-#include "dbscan.h"
 #include "utils.h"
 
 class DBScanner{
