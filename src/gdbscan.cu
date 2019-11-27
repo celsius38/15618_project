@@ -7,7 +7,7 @@
 #include <thrust/scan.h>
 #include <thrust/device_ptr.h>
 
-///#include "make_unique.h"
+#include "make_unique.h"
 
 
 struct GlobalConstants {
