@@ -20,6 +20,8 @@ struct GlobalConstants {
 
 __constant__ GlobalConstants cuConstParams;
 
+const int threadsPerBlock = 512;
+
 
 __global__ void
 bfs_kernel(size_t* boarder, int* labels, int counter) {
@@ -207,7 +209,6 @@ ParallelDBScanner::bfs(size_t i,
 }
 
 
-
 std::vector<size_t> 
 ParallelDBScanner::construct_graph(std::vector<size_t> &vertex_degree, 
                                     std::vector<size_t> &vertex_start_index, 
@@ -237,7 +238,6 @@ ParallelDBScanner::bfs_cuda(size_t* boarder, int* labels, int counter, size_t N)
     int labels_byte = sizeof(int) * N;
 
     // compute number of blocks and threads per block
-    const int threadsPerBlock = 512;
     const int blocks = (N + threadsPerBlock - 1) / threadsPerBlock;
 
     size_t* device_boarder;
@@ -266,7 +266,6 @@ ParallelDBScanner::degree_cuda(size_t* vertex_degree, float* points_x, float* po
     int bytes_points = sizeof(float) * N;
 
     // compute number of blocks and threads per block
-    const int threadsPerBlock = 512;
     const int blocks = (N + threadsPerBlock - 1) / threadsPerBlock;
 
     size_t* device_degree;
@@ -299,7 +298,6 @@ ParallelDBScanner::adj_list_cuda(size_t* vertex_start_index, size_t* adj_list, f
     int bytes_points = sizeof(float) * N;
 
     // compute number of blocks and threads per block
-    const int threadsPerBlock = 512;
     const int blocks = (N + threadsPerBlock - 1) / threadsPerBlock;
 
     size_t* device_start_index;
@@ -342,6 +340,7 @@ ParallelDBScanner::start_index_cuda(size_t* vertex_start_index, size_t N) {
     cudaMemcpy(vertex_start_index, device_start_index, bytes, cudaMemcpyDeviceToHost);
     cudaFree(device_start_index);
 }
+
 
 std::unique_ptr<DBScanner> createParallelDBScanner(){
     return std::make_unique<ParallelDBScanner>();
