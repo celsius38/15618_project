@@ -8,6 +8,7 @@
 #define MIN(x, y) (((x) < (y)) ? (x) : (y))
 #define CEIL(x,y) (((x) + (y) - 1) / (y))
 
+
 class Vec2
 {
 public:
