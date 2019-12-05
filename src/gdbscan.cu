@@ -76,15 +76,15 @@ squared_distance(float2 p1, float2 p2){
     return sqrt(x*x + y*y);
 }
 
-class ParallelDBScanner: public DBScanner
+class GDBScanner: public DBScanner
 {
 public: 
     /* Return total number of clusters
      * insert corresponding cluster id in `labels`
      * -1 stands for noise, 0 for unprocessed, otherwise stands for the cluster id
      */
-    ParallelDBScanner();
-    ~ParallelDBScanner();
+    GDBScanner();
+    ~GDBScanner();
     size_t scan(
         std::vector<Vec2> &points, std::vector<int> &labels, float eps, size_t min_points
     );
@@ -115,7 +115,7 @@ private:
     void check_scanner_const();
 };
 
-ParallelDBScanner::ParallelDBScanner(){
+GDBScanner::GDBScanner(){
     num_points = 0;
     adj_list_size = 0;
     host_degree = NULL;
@@ -129,7 +129,7 @@ ParallelDBScanner::ParallelDBScanner(){
 }
 
 
-ParallelDBScanner::~ParallelDBScanner(){
+GDBScanner::~GDBScanner(){
     if(host_degree) delete[] host_degree;
 
     if(device_points) cudaFree(device_points);
@@ -140,7 +140,7 @@ ParallelDBScanner::~ParallelDBScanner(){
 
 
 void
-ParallelDBScanner::setup(std::vector<Vec2> &points, float eps, size_t min_points)
+GDBScanner::setup(std::vector<Vec2> &points, float eps, size_t min_points)
 {
     // allocate host data
     this -> squared_eps = eps * eps;
@@ -171,7 +171,7 @@ ParallelDBScanner::setup(std::vector<Vec2> &points, float eps, size_t min_points
 
 
 size_t 
-ParallelDBScanner::scan(
+GDBScanner::scan(
     std::vector<Vec2> &points, std::vector<int> &labels, float eps, size_t min_points
 )
 {
@@ -196,7 +196,7 @@ ParallelDBScanner::scan(
 
 
 bool 
-ParallelDBScanner::isEmpty(std::vector<size_t>& border)
+GDBScanner::isEmpty(std::vector<size_t>& border)
 {
     for(size_t i = 0; i < border.size(); i++) {
         if(border[i]) {
@@ -231,7 +231,7 @@ bfs_kernel(size_t* border, int* labels, int counter) {
 
 
 void 
-ParallelDBScanner::bfs_cuda(size_t* border, int* labels, int counter)
+GDBScanner::bfs_cuda(size_t* border, int* labels, int counter)
 {
     const int blocks = CEIL(num_points, THREADS_PER_BLOCK);
     size_t* device_border;
@@ -255,7 +255,7 @@ ParallelDBScanner::bfs_cuda(size_t* border, int* labels, int counter)
 
 // bfs starting at point i and current number of clusters = counter
 void 
-ParallelDBScanner::bfs(size_t i, size_t counter, std::vector<int> &labels)
+GDBScanner::bfs(size_t i, size_t counter, std::vector<int> &labels)
 {
     // TODO: use bit vector
     std::vector<size_t> border(num_points, 0);
@@ -306,7 +306,7 @@ adj_list_kernel()
 
 
 void
-ParallelDBScanner::construct_graph(){
+GDBScanner::construct_graph(){
     // calculate degree
     const int blocks = CEIL(num_points, THREADS_PER_BLOCK);
     degree_kernel<<<blocks, THREADS_PER_BLOCK>>>();
@@ -344,7 +344,7 @@ ParallelDBScanner::construct_graph(){
 }
 
 void 
-ParallelDBScanner::check_scanner_const(){
+GDBScanner::check_scanner_const(){
     std::cout << "host: squared_eps: " << squared_eps << 
         " min_points: " << min_points << " num_points: " << num_points << 
         " adj_list_size: " << adj_list_size << std::endl;
@@ -356,8 +356,9 @@ ParallelDBScanner::check_scanner_const(){
         " host_degree[999]: " << host_degree[999] << std::endl;
 }
 
-std::unique_ptr<DBScanner> createParallelDBScanner(){
-    return std::make_unique<ParallelDBScanner>();
+std::unique_ptr<DBScanner> createGDBScanner()
+{
+    return std::make_unique<GDBScanner>();
 }
 
 

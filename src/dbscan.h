@@ -13,7 +13,6 @@ public:
 };
 
 std::unique_ptr<DBScanner> createSequentialDBScanner();
-std::unique_ptr<DBScanner> createSeq2DBScanner();
-std::unique_ptr<DBScanner> createParallelDBScanner();
+std::unique_ptr<DBScanner> createGDBScanner();
 
 #endif
