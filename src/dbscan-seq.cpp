@@ -16,7 +16,17 @@ public:
     ){ 
         using std::vector;
         using std::deque;
-        vector<vector<size_t>> allNeighbors = findNeighbors(points, eps);
+        vector<vector<size_t>> allNeighbors = findNeighbors(points, eps); 
+
+#if defined(DEBUG)
+        size_t ttl = 0;
+        for(size_t i = 0; i < allNeighbors.size(); ++i){
+            printf("%lu: %lu\n", i,allNeighbors[i].size());
+            ttl += allNeighbors[i].size();
+        }
+        printf("ttl degree: %lu\n", ttl);
+#endif
+
         size_t counter = 0;  // current number of clusters
         for(size_t i = 0; i < points.size(); i++){
             auto point = points[i];

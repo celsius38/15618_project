@@ -11,7 +11,8 @@
 
 enum class ScannerType{
     Sequential,
-    Gdbscan
+    Gdbscan,
+    DPGdbscan
 };
 
 /*
@@ -125,9 +126,11 @@ int main(int argc, const char ** argv){
     std::cout << "Taking " << CycleTimer::currentMSeconds()-start << " ms"<< std::endl;
     std::cout << "====================" << std::endl;
     std::cout << numClusters << " clusters" << std::endl; 
+#if not defined(DEBUG)
     for(auto label: labels){
         std::cout << label << std::endl;
     }
+#endif
     return 0;
 }
 
