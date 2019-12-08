@@ -31,7 +31,7 @@ def plot(scanner_type: str, in_file: str, eps: float, min_points: int):
     else:
         result = dbscan_invoke(scanner_type, in_file, eps, min_points)
     # mapping from cluster to color
-    colors = cm.rainbow(np.linspace(0, 1, result.num_clusters)) 
+    colors = cm.rainbow(np.linspace(0, 1, result.num_clusters + 1)) 
     for p,l in zip(points, result.labels):
         c = colors[l] if l >= 0 else 'k'
         plt.scatter(p[0],p[1],color=c)
