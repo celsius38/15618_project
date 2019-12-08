@@ -1,6 +1,7 @@
 benchmark-files
-logs 
+logs
 objs
+plot
 
 *.pyc
 *.swp

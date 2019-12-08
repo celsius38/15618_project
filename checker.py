@@ -62,7 +62,7 @@ def get_args():
     specify to only run for a single file:
         `python3 checker.py -in src/benchmark-files/random-1000.in`
     """
-    parser = argparse.ArgumentParser("Checker.py arguments")
+    parser = argparse.ArgumentParser("checker.py arguments")
     parser.add_argument("--check", action="store_true",
                         help="Turn on correctness check")
     parser.add_argument("--eps", type=float, default=1.)
@@ -71,7 +71,7 @@ def get_args():
                         metavar="src/benchmark-files/random-1000.in",
                         default=IN_FILES)
     parser.add_argument("--scannerTypes", type=str, nargs='+',
-                        choices=["seq"],
+                        choices=["seq", "gdbscan"],
                         default=SCANNER_TYPES,
                         help="List of scanner types to test with")
     return parser.parse_args()
