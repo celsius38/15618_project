@@ -5,6 +5,7 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
+from tqdm.auto import tqdm
 
 from checker import dbscan_invoke, dbscan_ref
 
@@ -32,7 +33,9 @@ def plot(scanner_type: str, in_file: str, eps: float, min_points: int):
         result = dbscan_invoke(scanner_type, in_file, eps, min_points)
     # mapping from cluster to color
     colors = cm.rainbow(np.linspace(0, 1, result.num_clusters + 1)) 
-    for p,l in zip(points, result.labels):
+    itr = tqdm(zip(points, result.labels))
+    itr.total = len(result.labels)
+    for p,l in itr:
         c = colors[l] if l >= 0 else 'k'
         plt.scatter(p[0],p[1],color=c)
     path = os.path.join(PLOT_DIR, os.path.splitext(os.path.basename(in_file))[0],
