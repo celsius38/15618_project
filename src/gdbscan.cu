@@ -1,6 +1,5 @@
 #include <memory>
 #include <math.h>
-#include "dbscan.h"
 #include <stddef.h>
 
 #include <cuda.h>
@@ -10,6 +9,7 @@
 #include <thrust/device_ptr.h>
 #include <thrust/execution_policy.h>
 
+#include "dbscan.h"
 #include "make_unique.h"
 
 #define checkCuda(ans) { gpuAssert((ans), __FILE__, __LINE__); }
