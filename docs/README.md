@@ -1,6 +1,79 @@
-# Project Checkpoint(Nov.18th)
+# Final Report(Dec.9th)
 [Link to the project page](https://celsius38.github.io/15618_project/)
 
+## Summary
+In this project we explore different methods including CUDA and MPI to speed up a well-known clustering algorithm: dbscan. We started from the a very basic `c++` sequential version and gradually make our way to more complex and more advanced algorithms such as [G-DBSCAN] and [RP-DBSCAN]. We also try to optimize the part where these algorithms are relatively inefficient and try to adapt the original map-reduce pattern to MPI. We compare our methods against `sklearn.cluster.DBSCAN` in terms of efficiency, and discuss which algorithm is more preferable under different hyper-parameter settings.
+
+## Background
+### Introduction to DBSCAN
+`DBSCAN` is a non-parametric density-based clustering algorithm (typically) on Euclidean space. It works by finding the number of connected parts (a.k.a. number of islands) on a graph where vertices are points and (directed) edges are non-symmetric reachability defined as following:
+$$Neighbor_p = \{q: dist(p,q) \leq \epsilon \}$$
+$$isCore(p) = \left \vert Neighbor_p \right \vert \geq N  $$
+$$p \rightarrow q \text{ if } isCore(p) \land dist(p, q) \leq \epsilon $$
+where $dist$ is a distance function (e.g.: Euclidean distance), hyper-parameter $\epsilon$ is the maximum distance for two points to be classified as neighbors, and hyper-parameter $N$ is the minimum number of neighbors for a point to be classified as *core point*. In the end, every point will either has a `cluster_id` or `-1` as noise. For simplicity and demo purpose, we will only be dealing with two-dimensional points in the project.
+
+The following figure consisting 100,000 points (also one of our test-cases): ![moons](image/moons.png)
+
+Therer are 3 classes for the specific hyper-parameter we are using, one blue, one green and one red, and the rest transparent grey ones are noise.
+
+
+
+Typically, the algorithm has two major steps:   
+
+* Graph construction:
+	* In this step, we find all neighbors for every point, and also classify each point as either *core* or *non-core* point based on the number of neighbors it has. 
+* BFS/DFS:
+	* In this step, we start with any point that is not yet classified and is a core point and do either a breadth-first search or a depth-first search and stop until we reach a *non-core* point or a point of another cluster.
+
+Naively implemented, the first step has a complexity of $O(n^2)$ as we have to inspect the distance of every pari of point. Then the second step has a complexity of $O(V + E)$ for either BFS or DFS.
+
+
+### DBSCAN break-down
+First of all, we notice that the first step is a very typical *N-body problem*, where given a point we want to find all points within radius of $\epsilon$, and the key idea is to either use some tree structures to partition the space and eliminate sub-spaces too far away from the point of interest. This we actually have seen in `Assignment 3` and `Assignment 4`, and in addition to *quad-tree*, we could also use *k-d tree*, which is a little bit more involved but the ideas are the same. Since we have done *quad-tree* before, we decided to take the *data-parallel* approach introduced in `Lecture 7` but we have never actually implemented. Also, this part is exactly where the original [G-DBSCAN] algorithm is lacking and we hope to see a performance boost from `data-parallel`.
+
+The graph construction part could also be parallelized by distributing the work to different workers through MPI. Each `worker` would only be constructing a subset of all points and `master` will collect the result and merge all different sub-graphs constructed by each `worker`. This is actually more invovled and we will actually be constructing the graph on cells instead of on points and we will defer the discussion until we introduce [RP-DBSCAN]
+
+The second step could also be parallelized by level-synchronized BFS. We process the initial  core point(`level 0`), and mark all its neighbors to be visited in the next round(`level 1`). Everytime we visit `level N` and mark all points to be visited at `level N + 1` and we stop if no points are marked at the currect level. We paralleize over point where each thread would check its point need to be visited this round. We synchronize at every level (launch kernel for every level)
+
+
+## Implementations
+### G-DBSCAN
+For `G-DBSCAN` we use CUDA. As a starting point, we implement the original algorithm as described in [G-DBSCAN].
+
+#### Graph construction:
+```[c++]
+__device__ distance(float2 p1, float2 p2){...}
+
+__global__ void
+degree_kernel(...) {
+	int v = blockIdx.x * blockDim.x + threadIdx.x;
+	if ( v >= num_points) return;
+	size_t degree = 0;
+	float2 p1 = ((float2*)(points))[v];
+	for(size_t i = 0; i < num_points; ++i){
+		float2 p2 = ((float2*)(points))[i];
+		if(distance(p1, p2) <= eps){
+			++degree;
+    	}
+	}
+	point_degree[v] = degree;
+}
+
+```
+To speed up the loading, we convert the point to `float2` and load one `float2` at a time from the `points`. Also, to prevent copying back and forth between `host` and `device`, we try to keep all data all `device`, and also specifying the execution policy of `thrust` to be `thrust::device`.
+
+After we have the degree of each vertex, 
+
+#### BFS:
+
+
+### G-DBSCAN Data Parallel
+#### Graph construction:
+
+### RP-DBSCAN
+
+
+## Results
 ## Updated Schedule
 So far, we have kept pace with the planned schedule. Specifically, we now have a working version of sequential version, a G-DBSCAN and the python `sklearn` package implementation as reference
 
@@ -18,8 +91,6 @@ So far, we have kept pace with the planned schedule. Specifically, we now have a
 As mentioned before, we have so far kept pace with the planned schedule, but largely due to that all algorithms we have implemented so far are on the relatively easy side, and the true challenge will be [RP-DBSCAN] and we expect to spend roughly two weeks on that. Also, we expect to improve the [G-DBSCAN] by using either the k-d tree or the N-Body data-parallel approach mentioned in the lecture.
 
 For the poster session: we plan to explain our approach to the problem, and the optimizations/tricks we have used throughout the implementation. We will also show graphs which compare the various aspects (speedup, time breakdown, load balance, scalability, and memory footprint) of different scan algorithms on different scenario.
-
-
 
 ## Preliminary Result and Issues
 We start from scratch and build a workflow of:   
@@ -50,17 +121,17 @@ Also we notice a dubious large runtime for `ParallelDBScanner` on `random-1000`,
 
 \[1\] Ester, M., Kriegel, H.P., Sander, J. and Xu, X., 1996, August. A density-based algorithm for discovering clusters in large spatial databases with noise. In Kdd (Vol. 96, No. 34, pp. 226-231).
 
-[g-dbscan]: https://www.sciencedirect.com/science/article/pii/S1877050913003438
+[G-DBSCAN]: https://www.sciencedirect.com/science/article/pii/S1877050913003438
 \[2\] Andrade, G., Ramos, G., Madeira, D., Sachetto, R., Ferreira, R. and Rocha, L., 2013. G-dbscan: A gpu accelerated algorithm for density-based clustering. Procedia Computer Science, 18, pp.369-378.
 
-[pds-dbscan]: https://ieeexplore.ieee.org/document/6468492
+[PDS-DBSCAN]: https://ieeexplore.ieee.org/document/6468492
 \[3\] Patwary, M.A., Palsetia, D., Agrawal, A., Liao, W.K., Manne, F. and Choudhary, A., 2012, November. A new scalable parallel DBSCAN algorithm using the disjoint-set data structure. In Proceedings of the International Conference on High Performance Computing, Networking, Storage and Analysis (p. 62). IEEE Computer Society Press.
 
-[mr-dbscan]: https://ieeexplore.ieee.org/document/6121313
+[MR-DBSCAN]: https://ieeexplore.ieee.org/document/6121313
 \[4\] He, Y., Tan, H., Luo, W., Mao, H., Ma, D., Feng, S. and Fan, J., 2011, December. Mr-dbscan: an efficient parallel density-based clustering algorithm using mapreduce. In 2011 IEEE 17th International Conference on Parallel and Distributed Systems (pp. 473-480). IEEE.
 
-[ng-dbscan]: http://www.vldb.org/pvldb/vol10/p157-lulli.pdf
+[NG-DBSCAN]: http://www.vldb.org/pvldb/vol10/p157-lulli.pdf
 \[5\] Lulli, A., Dell'Amico, M., Michiardi, P. and Ricci, L., 2016. NG-DBSCAN: scalable density-based clustering for arbitrary data. Proceedings of the VLDB Endowment, 10(3), pp.157-168.
 
-[rp-dbscan]: https://dm.kaist.ac.kr/lab/papers/sigmod18.pdf
+[RP-DBSCAN]: https://dm.kaist.ac.kr/lab/papers/sigmod18.pdf
 \[6\]Song, H. and Lee, J.G., 2018, May. RP-DBSCAN: A superfast parallel DBSCAN algorithm based on random partitioning. In Proceedings of the 2018 International Conference on Management of Data (pp. 1173-1187). ACM.
