@@ -116,7 +116,6 @@ public:
             cluster_count = labelCoreCells(local_partition, local_adj_list, cell_cluster_id);
             labelPointsInCoreCells(cell_cluster_id, labels);
             // TODO label points in non core cells
-            // TODO combine and get global point_is_core
             labelPointsInNonCoreCells(cell_cluster_id, point_is_core_map, labels);
         }
 
@@ -153,7 +152,7 @@ private:
         MPI_Type_commit(&MPI_Cell);
     }
 
-    void addIntoMap(unordered_map<size_t, short> point_is_core_map, vector<size_t> point_id, vector<short> point_is_core) {
+    void addIntoMap(unordered_map<size_t, short> point_is_core_map, vector<size_t>& point_id, vector<short>& point_is_core) {
         for(int i = 0; i < point_id.size(); i++) {
             point_is_core_map[point_id[i]] = point_is_core[i];
         }
@@ -224,7 +223,7 @@ private:
     // label all connected core cells the same cluster
     void bfs(int root_cell_id, 
              vector<int>& visited, 
-             vector<Cell> all_cells,
+             vector<Cell>& all_cells,
              vector<size_t>& adj_list, 
              int cluster_id,
              vector<int>& cell_cluster_id) {
@@ -295,7 +294,7 @@ private:
         }
     }
 
-    void addOneCellNeighbours(vector<size_t> neighbours, size_t point_id, int cell_row_id, int cell_col_id) {
+    void addOneCellNeighbours(vector<size_t>& neighbours, size_t point_id, int cell_row_id, int cell_col_id) {
         if(cell_row_id < 0 || cell_row_id > row_bins || cell_col_id < 0 || cell_col_id > col_bins) {
             return;
         }
