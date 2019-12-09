@@ -6,8 +6,7 @@
 #include <cuda_runtime.h>
 #include <thrust/execution_policy.h>
 
-
-struct GlobalConstants{
+struct GlobalConstants {
     float eps;
     size_t min_points;
     size_t num_points;
@@ -21,19 +20,22 @@ struct GlobalConstants{
 
     float* points; 
     size_t* point_index;
-    int* cell_index;
+    size_t* cell_index;
     size_t* cell_start_index;
     size_t* cell_end_index;
 } 
-
 
 __constant__ GlobalConstants constParams;
 
 const unsigned int RandSeed = 15618;
 
 void
-setup(){
-    // TODO: allocate host data
+RPDBScanner::setup(std::vector<Vec2>& points, float eps, size_t minPts){
+    this -> points = points;
+    this -> num_points = points.size();
+    this -> eps = eps;
+    this -> minPts = minPts;
+
     // find lower left point and row_cells, col_cells and cell side length
     float min_x(0.), min_y(0.);
     float max_x(0.), max_y(0.);
@@ -44,12 +46,29 @@ setup(){
         max_x = MAX(max_x, point.x);
         max_y = MAX(max_y, point.y);
     }
-    float side = eps * sqrt(2) / 2.f; // diagonal is eps
+    this -> min_x = min_x;
+    this -> min_y = min_y;
+    side = eps * sqrt(2) / 2.f; // diagonal is eps
     row_cells = ceil((max_y - min_y)/side);
     col_cells = ceil((max_x - min_x)/side);
-    int num_cells = row_cells * col_cells;
-    // TODO: allocate device data
-    // TODO: copy points to device
+    num_cells = row_cells * col_cells;
+
+    // allocate host data
+    point_index = new size_t[num_points];
+    cell_index = new size_t[num_points];
+    cell_start_index = new size_t[num_cells];
+    cell_end_index = new size_t[num_cells];
+
+    // allocate device data
+    cudaMalloc(&device_points, sizeof(float)*2*num_points);
+    cudaMalloc(&device_point_index, sizeof(size_t)*num_points);
+    cudaMalloc(&device_cell_index, sizeof(size_t)*num_points);
+    cudaMalloc(&device_cell_start_index, sizeof(size_t)*num_cells);
+    cudaMalloc(&device_cell_end_index, sizeof(size_t)*num_cells);
+
+    // copy points to device
+    cudaMemcpy(device_points, (float*)points.data(), points_bytes, cudaMemcpyHostToDevice);
+
     // copy constant to device
     GlobalConstants params;
     params.eps = eps;
@@ -122,7 +141,7 @@ random_split(int num_partitions, int worker_id)
 
 
 void
-construct_global_graph(){ 
+RPDBScanner::construct_global_graph(){ 
     // assign cell id and cell start end
     const int blocks = CEIL(num_points, THREADS_PER_BLOCK);
     assign_cell_id_kernel<<<blocks, THREADS_PER_BLOCK>>>();
@@ -133,6 +152,8 @@ construct_global_graph(){
 }
 
 
+// given a point p1, calculate the number of neighbors in 
+// cell(row_idx, col_idx)
 __device__ size_t
 point_degree_in_cell(float2 p1, int row_idx, int col_idx){
     if( (row_idx < 0) || (row_idx >= constParams.row_cells) ||
@@ -180,6 +201,8 @@ mark_core_kernel(int partition_size, int num_points_in_partition,
 }
 
 
+// given a core point p1, tell if cell(row_idx, col_idx) is reachable
+// from the cell p1 is in
 __device__ void
 mark_cell_to_cell_edge(float2 p1, int row_idx, int col_idx,
                         short* cell_to_cell_edge,
@@ -228,14 +251,16 @@ cell_to_cell_edge_kernel(size_t num_points_in_partition,
 }
 
 // each partition is a list of cell id 
+
 void
-construct_partial_cell_graph(
-    int* partition, int partition_size,
+RPDBScanner::construct_partial_cell_graph(
+    vector<int> partition,
     std::vector<size_t>& ret_point_ids, std::vector<short>& ret_point_is_core,
-    std::vector<Cell>& ret_cells, std::vector<size_t>* ret_cell_adj_list
+    std::vector<Cell>& ret_cells, std::vector<size_t>& ret_cell_adj_list
 )
 {
     // calculate num_points in partition 
+    size_t partition_size = partition.size();
     vector<size_t> raw_index;  // raw idx into point_index and cell_index
     vector<int> cell_order; // cell order in partition for each raw idx
     int order = 0;

@@ -11,7 +11,7 @@ LDFLAGS=-L/usr/local/depot/cuda-8.0/lib64/ -lcudart
 NVCC=nvcc
 NVCCFLAGS=-std=c++11 -O3 -m64 --gpu-architecture compute_35
 
-OBJS=$(OBJDIR)/main.o $(OBJDIR)/dbscan-seq.o $(OBJDIR)/dbscan-seq2.o $(OBJDIR)/dbscan-mpi.o $(OBJDIR)/gdbscan.o\
+OBJS=$(OBJDIR)/main.o $(OBJDIR)/dbscan-seq.o $(OBJDIR)/dbscan-seq2.o $(OBJDIR)/gdbscan.o $(OBJDIR)/rpdbscan.o $(OBJDIR)/dbscan-mpi.o\
 
 .PHONY: dirs clean
 
@@ -26,10 +26,10 @@ clean:
 $(EXECUTABLE): dirs $(OBJS)
 		$(CXX) $(CXXFLAGS) -o $@ $(OBJS) $(LDFLAGS)
 
-$(OBJDIR)/%.o: %.cpp
-		$(CXX) $< $(CXXFLAGS) -c -o $@
-
 $(OBJDIR)/%.o: %.cu
 		$(NVCC) $< $(NVCCFLAGS) -c -o $@
+
+$(OBJDIR)/%.o: %.cpp
+		$(CXX) $< $(CXXFLAGS) -c -o $@
 
 
