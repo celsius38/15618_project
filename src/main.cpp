@@ -107,10 +107,6 @@ std::vector<Vec2> loadFromFile(std::string fileName){
  */
 int main(int argc, const char ** argv){
     Options options = parseOptions(argc, argv);
-    std::cout << "inFile: " << options.inFile << std::endl;
-    std::cout << "scannerType: " << plainScannerType(options.scannerType) << std::endl;
-    std::cout << "eps: " << options.eps << std::endl;
-    std::cout << "minPts: " << options.minPts << std::endl;
     // load points
     std::vector<Vec2> points = loadFromFile(options.inFile);
     // choose scanner type
@@ -130,14 +126,22 @@ int main(int argc, const char ** argv){
     std::vector<int> labels(points.size(), 0);
     double start = CycleTimer::currentMSeconds(); 
     size_t numClusters = scanner->scan(points, labels, options.eps, options.minPts);
-    std::cout << "Taking " << CycleTimer::currentMSeconds()-start << " ms"<< std::endl;
-    std::cout << "====================" << std::endl;
-    std::cout << numClusters << " clusters" << std::endl; 
+    // assume real numCluster will always larger than 0
+    // return 0 means the worker is not master
+    if(numClusters > 0) {
+        std::cout << "inFile: " << options.inFile << std::endl;
+        std::cout << "scannerType: " << plainScannerType(options.scannerType) << std::endl;
+        std::cout << "eps: " << options.eps << std::endl;
+        std::cout << "minPts: " << options.minPts << std::endl;
+        std::cout << "Taking " << CycleTimer::currentMSeconds()-start << " ms"<< std::endl;
+        std::cout << "====================" << std::endl;
+        std::cout << numClusters << " clusters" << std::endl; 
 #if not defined(DEBUG)
-    for(auto label: labels){
-        std::cout << label << std::endl;
-    }
+        for(auto label: labels){
+            std::cout << label << std::endl;
+        }
 #endif
+    }
     return 0;
 }
 
