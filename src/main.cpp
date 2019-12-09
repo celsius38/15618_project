@@ -12,7 +12,7 @@
 enum class ScannerType{
     Sequential,
     Gdbscan,
-    DPGdbscan
+    RPdbscan
 };
 
 /*
@@ -34,6 +34,8 @@ std::string plainScannerType(ScannerType type) {
             return "sequential";
         case ScannerType::Gdbscan:
             return "GDBSCAN";
+        case ScannerType::RPdbscan:
+            return "RPdbscan";
     }
     return "sequential";
 }
@@ -66,6 +68,8 @@ Options parseOptions(int argc, const char ** argv){
             opt.scannerType = ScannerType::Sequential;
         }else if(strcmp(argv[i], "--gdbscan") == 0) {
             opt.scannerType = ScannerType::Gdbscan;
+        } else if(strcmp(argv[i], "--rpdbscan") == 0) {
+            opt.scannerType = ScannerType::RPdbscan;
         }
     }
     if(opt.inFile.empty()){
@@ -117,6 +121,9 @@ int main(int argc, const char ** argv){
             break;
         case ScannerType::Gdbscan:
             scanner = createGDBScanner();
+            break;
+        case ScannerType::RPdbscan:
+            scanner = createRPDBScanner();
             break;
     }
     // scan

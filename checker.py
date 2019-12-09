@@ -105,6 +105,8 @@ def dbscan_invoke(scanner_type:str, in_file:str, eps:float, min_pts:int) -> Scan
         BINARY, "--input", in_file, "--eps", str(eps), "--minPts", str(min_pts),
         "--" + scanner_type
     ])
+    if scanner_type == "rpdbscan":
+        args = "mpirun -np 8 " + args
     result = subprocess.run(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
     if(result.returncode) != 0:
         return None
