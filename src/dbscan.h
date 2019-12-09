@@ -16,4 +16,23 @@ std::unique_ptr<DBScanner> createSequentialDBScanner();
 std::unique_ptr<DBScanner> createGDBScanner();
 std::unique_ptr<DBScanner> createRPDBScanner();
 
+struct HyperParameters {
+    float eps;
+    size_t min_points;
+    size_t num_points;
+
+    float min_x;
+    float min_y;
+    float side;
+    int num_cells;
+    int row_cells;
+    int col_cells;
+
+    float* points; 
+    size_t* point_index;
+    size_t* cell_index;
+    size_t* cell_start_index;
+    size_t* cell_end_index;
+};
+
 #endif

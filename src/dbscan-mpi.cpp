@@ -1,5 +1,6 @@
 #include "dbscan.h"
 #include "mpi.h"
+#include "utils.h"
 #include "make_unique.h"
 #include <memory>
 #include <vector>
@@ -8,8 +9,7 @@
 
 #define MASTER 0
 
-std::vector<int> random_split(int num_partitions, int worker_id);
-
+const unsigned int RandSeed = 15618;
 
 MPI_Datatype MPI_Cell;
 
@@ -21,35 +21,50 @@ public:
     size_t start_index;
 };
 
+
+// TODO
+/*
+void
+construct_partial_cell_graph(
+    vector<int> partition,
+    std::vector<size_t>& ret_point_ids, std::vector<short>& ret_point_is_core,
+    std::vector<Cell>& ret_cells, std::vector<size_t>& ret_cell_adj_list
+);
+*/
+void construct_global_graph(HyperParameters* params, size_t* point_index, size_t* cell_index, size_t* cell_start_index, size_t* cell_end_index);
+void setup_device(HyperParameters* params, std::vector<Vec2> &points);
+
 class RPDBScanner: public DBScanner {
 public: 
     /* Return total number of clusters
      * insert corresponding cluster id in `labels`
      * -1 stands for noise, 0 for unprocessed, otherwise stands for the cluster id
      */
-    RPDBScanner(){ 
-        eps = 0.f;
-        min_points = 0;
-        num_points = 0;
+    RPDBScanner() { 
+        params.eps = 0.f;
+        params.min_points = 0;
+        params.num_points = 0;
 
-        min_x = 0.f;
-        min_y = 0.f;
-        side = 0.f;
-        num_cells = 0;
-        row_cells = 0;
-        col_cells = 0;
+        params.min_x = 0.f;
+        params.min_y = 0.f;
+        params.side = 0.f;
+        params.num_cells = 0;
+        params.row_cells = 0;
+        params.col_cells = 0;
 
-        point_index = NULL;
-        cell_index = NULL;
-        cell_start_index = NULL;
-        cell_end_index = NULL;
+        params.points = NULL;
+        params.point_index = NULL;
+        params.cell_index = NULL;
+        params.cell_start_index = NULL;
+        params.cell_end_index = NULL;
     }
 
-    ~RPDBScanner(){
-        if(point_index) delete[] point_index;
-        if(cell_index) delete[] cell_index;
-        if(cell_start_index) delete[] cell_start_index;
-        if(cell_end_index) delete[] cell_end_index;
+    ~RPDBScanner() {
+        if(params.points) delete[] params.points;
+        if(params.point_index) delete[] params.point_index;
+        if(params.cell_index) delete[] params.cell_index;
+        if(params.cell_start_index) delete[] params.cell_start_index;
+        if(params.cell_end_index) delete[] params.cell_end_index;
     }
 
     size_t scan(std::vector<Vec2> &points, 
@@ -68,7 +83,7 @@ public:
 
         // Stage 1: data partition
         setup(points, eps, minPts);
-        construct_global_graph();
+        construct_global_graph(&params, point_index, cell_index, cell_start_index, cell_end_index);
         std::vector<int> local_cell_index = random_split(numtasks, taskid);
         size_t local_cell_count = local_cell_index.size();
 
@@ -78,10 +93,13 @@ public:
 
         std::vector<size_t> local_point_id;
         std::vector<short> local_point_is_core;
+        // TODO
+        /*
         construct_partial_cell_graph(
             local_cell_index, 
             local_point_id, local_point_is_core,
             local_partition, local_adj_list);
+            */
         size_t local_point_count = local_point_id.size();
         size_t local_adj_list_len = local_adj_list.size();
 
@@ -156,35 +174,43 @@ public:
     }
 
 private:
-    // TODO: real
-    float eps;
-    size_t min_points;
-    size_t num_points;
+    HyperParameters params;
     std::vector<Vec2> points;
-    float* device_points;
-
-    float min_x;
-    float min_y;
-    float side; 
-    int num_cells;
-    int row_cells;
-    int col_cells;
-
     size_t* point_index;
-    size_t* device_point_index;
     size_t* cell_index;
-    size_t* device_cell_index;
     size_t* cell_start_index;
-    size_t* device_cell_start_index;
     size_t* cell_end_index;
-    size_t* device_cell_end_index;
-    
-    void setup(std::vector<Vec2>& points, float eps, size_t minPts);
-    void construct_global_graph();
-    void construct_partial_cell_graph(std::vector<int> partition,
-        std::vector<size_t>& ret_point_ids, std::vector<short>& ret_point_is_core,
-        std::vector<Cell>& ret_cells, std::vector<size_t>& ret_cell_adj_list
-    );
+
+    void setup(std::vector<Vec2> &points, float eps, size_t min_points) {
+        this->points = points;
+        params.eps = eps;
+        params.min_points = min_points;
+        params.num_points = points.size();
+
+        // find lower left point and row_cells, col_cells and cell side length
+        float min_x(0.), min_y(0.);
+        float max_x(0.), max_y(0.);
+        for(size_t i = 0; i < points.size(); ++i){
+            Vec2 point = points[i];
+            min_x = MIN(min_x, point.x);
+            min_y = MIN(min_y, point.y);
+            max_x = MAX(max_x, point.x);
+            max_y = MAX(max_y, point.y);
+        }
+        params.min_x = min_x;
+        params.min_y = min_y;
+        params.side = eps * sqrt(2) / 2.f; // diagonal is eps
+        params.row_cells = ceil((max_y - params.min_y)/params.side);
+        params.col_cells = ceil((max_x - params.min_x)/params.side);
+        params.num_cells = params.row_cells * params.col_cells;
+
+        // allocate host data
+        params.point_index = new size_t[params.num_points];
+        params.cell_index = new size_t[params.num_points];
+        params.cell_start_index = new size_t[params.num_cells];
+        params.cell_end_index = new size_t[params.num_cells];
+        setup_device(&params, points);
+    }
 
     void createMPICell() {
         MPI_Datatype oldtypes[2] = {MPI_SHORT, MPI_UNSIGNED_LONG};
@@ -336,8 +362,8 @@ private:
     
     std::vector<size_t> findNeighbours(size_t point_id, int cell_id) {
         std::vector<size_t> neighbours;
-        int cell_row_id = cell_id/col_cells;
-        int cell_col_id = cell_id%col_cells;
+        int cell_row_id = cell_id/params.col_cells;
+        int cell_col_id = cell_id%params.col_cells;
         for(int row_diff = -2; row_diff < 3; ++row_diff) {
             for(int col_diff = -2; col_diff < 3; ++col_diff) {
                 addOneCellNeighbours(neighbours, point_id, cell_row_id+row_diff, cell_col_id+col_diff);
@@ -346,16 +372,30 @@ private:
     }
 
     void addOneCellNeighbours(std::vector<size_t>& neighbours, size_t point_id, int cell_row_id, int cell_col_id) {
-        if(cell_row_id < 0 || cell_row_id > row_cells || cell_col_id < 0 || cell_col_id > col_cells) {
+        if(cell_row_id < 0 || cell_row_id > params.row_cells || cell_col_id < 0 || cell_col_id > params.col_cells) {
             return;
         }
-        int cell_id = cell_row_id * col_cells + cell_col_id;
+        int cell_id = cell_row_id * params.col_cells + cell_col_id;
         for(size_t i = cell_start_index[cell_id]; i < cell_end_index[cell_id]; i++) {
             size_t other_point_id = point_index[i];
-            if((points[other_point_id]-points[point_id]).length() <= eps) {
+            if((points[other_point_id]-points[point_id]).length() <= params.eps) {
                 neighbours.push_back(other_point_id);
             }
         }
+    }
+
+    std::vector<int>
+    random_split(int num_partitions, int worker_id)
+    {
+        srand(RandSeed);
+        std::vector<int> res;
+        for(int cell_id = 0; cell_id < params.num_cells; ++cell_id){
+            int partition_id = rand() % num_partitions;
+            if(partition_id == worker_id){
+                res.push_back(cell_id);
+            }
+        }
+        return res;
     }
 };
 

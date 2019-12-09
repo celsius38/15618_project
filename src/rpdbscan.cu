@@ -1,91 +1,28 @@
 #include <stdlib.h>
 #include <memory>
 #include <math.h>
-
 #include <cuda.h>
 #include <cuda_runtime.h>
 #include <thrust/execution_policy.h>
+#include "dbscan.h"
 
-struct GlobalConstants {
-    float eps;
-    size_t min_points;
-    size_t num_points;
-
-    float min_x;
-    float min_y;
-    float side;
-    int num_cells;
-    int row_cells;
-    int col_cells;
-
-    float* points; 
-    size_t* point_index;
-    size_t* cell_index;
-    size_t* cell_start_index;
-    size_t* cell_end_index;
-} 
-
-__constant__ GlobalConstants constParams;
-
-const unsigned int RandSeed = 15618;
+__constant__ HyperParameters constParams;
+const int THREADS_PER_BLOCK = 512;
 
 void
-RPDBScanner::setup(std::vector<Vec2>& points, float eps, size_t minPts){
-    this -> points = points;
-    this -> num_points = points.size();
-    this -> eps = eps;
-    this -> minPts = minPts;
-
-    // find lower left point and row_cells, col_cells and cell side length
-    float min_x(0.), min_y(0.);
-    float max_x(0.), max_y(0.);
-    for(size_t i = 0; i < points.size(); ++i){
-        Vec2 point = points[i];
-        min_x = MIN(min_x, point.x);
-        min_y = MIN(min_y, point.y);
-        max_x = MAX(max_x, point.x);
-        max_y = MAX(max_y, point.y);
-    }
-    this -> min_x = min_x;
-    this -> min_y = min_y;
-    side = eps * sqrt(2) / 2.f; // diagonal is eps
-    row_cells = ceil((max_y - min_y)/side);
-    col_cells = ceil((max_x - min_x)/side);
-    num_cells = row_cells * col_cells;
-
-    // allocate host data
-    point_index = new size_t[num_points];
-    cell_index = new size_t[num_points];
-    cell_start_index = new size_t[num_cells];
-    cell_end_index = new size_t[num_cells];
-
+setup_device(HyperParameters* params, std::vector<Vec2> &points) {
     // allocate device data
-    cudaMalloc(&device_points, sizeof(float)*2*num_points);
-    cudaMalloc(&device_point_index, sizeof(size_t)*num_points);
-    cudaMalloc(&device_cell_index, sizeof(size_t)*num_points);
-    cudaMalloc(&device_cell_start_index, sizeof(size_t)*num_cells);
-    cudaMalloc(&device_cell_end_index, sizeof(size_t)*num_cells);
+    cudaMalloc(&params->points, sizeof(float)*2*params->num_points);
+    cudaMalloc(&params->point_index, sizeof(size_t)*params->num_points);
+    cudaMalloc(&params->cell_index, sizeof(size_t)*params->num_points);
+    cudaMalloc(&params->cell_start_index, sizeof(size_t)*params->num_cells);
+    cudaMalloc(&params->cell_end_index, sizeof(size_t)*params->num_cells);
 
     // copy points to device
-    cudaMemcpy(device_points, (float*)points.data(), points_bytes, cudaMemcpyHostToDevice);
+    cudaMemcpy(params->points, (float*)points.data(), sizeof(float)*2*params->num_points, cudaMemcpyHostToDevice);
 
     // copy constant to device
-    GlobalConstants params;
-    params.eps = eps;
-    params.min_points = min_points;
-    params.num_points = num_points;
-    params.min_x = min_x;
-    params.min_y = min_y;
-    params.side = side;
-    params.num_cells = num_cells;
-    params.row_cells = row_cells;    
-    params.col_cells = col_cells;
-    params.points = device_points;
-    params.point_index = device_point_index;
-    params.cell_index = device_cell_index;
-    params.cell_start_index = device_cell_start_index;
-    params.cell_end_index = device_cell_end_index;
-    cudaMemcpyToSymbol(constParams, &params, sizeof(GlobalConstants));
+    cudaMemcpyToSymbol(constParams, params, sizeof(HyperParameters));
 }
 
 
@@ -111,12 +48,12 @@ find_cell_start_end_kernel()
     if( v >= constParams.num_points) return;
     int cell_idx = constParams.cell_index[v];
     if( v == 0 ){
-        cell_start_index[cell_idx] = 0;
+        constParams.cell_start_index[cell_idx] = 0;
     }else{
         int last_cell_idx = constParams.cell_index[v-1];
         if(cell_idx != last_cell_idx){
-            cell_start_index[cell_idx] = v;
-            cell_end_index[last_cell_idx] = v;
+            constParams.cell_start_index[cell_idx] = v;
+            constParams.cell_end_index[last_cell_idx] = v;
         }
     }
     if( v == constParams.num_points - 1){// last point
@@ -124,34 +61,26 @@ find_cell_start_end_kernel()
     }
 } 
 
-
-std::vector<int>
-random_split(int num_partitions, int worker_id)
-{
-    srand(RandSeed);
-    std::vector<int> res;
-    for(int cell_id = 0; cell_id < num_cells; ++cell_id){
-        int partition_id = rand() % num_partitions;
-        if(partition_id == worker_id){
-            res.push_back(cell_id);
-        }
-    }
-    return res;
-}
-
-
 void
-RPDBScanner::construct_global_graph(){ 
+construct_global_graph(HyperParameters* params, 
+    size_t* host_point_index, size_t* host_cell_index, size_t* host_cell_start_index, size_t* host_cell_end_index) { 
     // assign cell id and cell start end
-    const int blocks = CEIL(num_points, THREADS_PER_BLOCK);
+    const int blocks = CEIL(params->num_points, THREADS_PER_BLOCK);
     assign_cell_id_kernel<<<blocks, THREADS_PER_BLOCK>>>();
     thrust::sort_by_key(thrust::device,
-                        device_cell_index, device_cell_index + num_points,
-                        device_point_index);
+                        params->cell_index, params->cell_index + params->num_points,
+                        params->point_index);
     find_cell_start_end_kernel<<<blocks, THREADS_PER_BLOCK>>>();
+
+    // copy global graph back to host
+    cudaMemcpy(host_point_index, params->point_index, sizeof(size_t)*params->num_points, cudaMemcpyDeviceToHost);
+    cudaMemcpy(host_cell_index, params->cell_index, sizeof(size_t)*params->num_points, cudaMemcpyDeviceToHost);
+    cudaMemcpy(host_cell_start_index, params->cell_start_index, sizeof(size_t)*params->num_cells, cudaMemcpyDeviceToHost);
+    cudaMemcpy(host_cell_end_index, params->cell_end_index, sizeof(size_t)*params->num_cells, cudaMemcpyDeviceToHost);
 }
 
 
+/*
 // given a point p1, calculate the number of neighbors in 
 // cell(row_idx, col_idx)
 __device__ size_t
@@ -253,7 +182,7 @@ cell_to_cell_edge_kernel(size_t num_points_in_partition,
 // each partition is a list of cell id 
 
 void
-RPDBScanner::construct_partial_cell_graph(
+construct_partial_cell_graph(
     vector<int> partition,
     std::vector<size_t>& ret_point_ids, std::vector<short>& ret_point_is_core,
     std::vector<Cell>& ret_cells, std::vector<size_t>& ret_cell_adj_list
@@ -347,5 +276,7 @@ RPDBScanner::construct_partial_cell_graph(
     return;
 
 }
+*/
+
 
 
