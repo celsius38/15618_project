@@ -220,9 +220,59 @@ And finally, we scan for each point its neighbors in surrounding cells again to 
 #### BFS
 The bfs part stays the same as in naive `G-DBSCAN`
 
-
 ### RP-DBSCAN
+While there is great speedup of our CUDA version DBSCAN, the performance is restricted by single machine. That's why we turn into MPI for large dataset.
 
+Inspired by one of the most recent research RP-DBSCAN targeted for MapReduce platform, we proposed and implemented a hybrid CUDA MPI version.
+
+In CUDA version, we split into two stages, namely graph construction and BFS, however, this workflow is not suitable for MPI since both stages are not computation insensitive, and communication cost will be overwhelmed. Hence, we changed it into three steps, namely work partitioning, partial graph construction and graph merging.
+
+Let’s first dive into two techniques applied, and then introduce the details of each steps.
+
+#### Technique 1. random partitioning
+One of the key problems is loading balancing, a great number of DBSCAN algorithms tend to assign continuous area to workers, which will cause serious load imbalance especially on skewed dataset. Since cell is relatively small grain compared to the whole space, by randomly assign cells to workers, we can achieve nearly perfect load balancing. We can see from the two graphs below, area will the same color will be assigned to the same worker, the right one is continuous assignment and the blue worker will have higer workload than others, while the left one is random assignment based on small cells and four workers have relatively the same workload.
+![inbalance](image/inbalance2.png) ![balance](image/inbalance.png)
+#### Technique 2. cell graph 
+Split space into cells whose diagonal is eps, we can use three lemmas which greatly accelerate the algorithm:
+
+Lemma 1: If there is a core point in the cell, all points in the cell belong to the same cluster. (As shown in the left most graph below, all points in C1 are in the same cluster.)
+
+Lemma 2: If cell 1 and cell 2 are core cells (there is a core point in the cell), and one core point p in cell 1 has a neighbor in cell 2, then all points in cell 1 and cell 2 belong to the same cluster. (As shown in the middle graph below) 
+
+Lemma 3: If cell 1 is a core cell, cell 2 is a non-core cell, and one core point p in cell 1 has a neighbor q in cell 2, then q belongs to the same cluster as cell 1. (As shown in the right graph below)
+
+![lemma1](image/lemma1.png) ![lemma2](image/lemma2.png) ![lemma3](image/lemma3.png)
+
+Having these three lemmas at hand we can confidently build a graph whose nodes are the entire cells instead of individually points.
+#### Step 1. Work partitioning 
+Partitioning the space into cells whose diagonal is eps and assign points to its cell. This process is similarly to the data parallel part introduced above. Cells are split into n partitions randomly and n is the number of workers in MPI.
+#### Step 2. Partial graph construction
+In this stage, we mark cells and points in the partition as core/non-core and construct a cell graph as shown in the pseudocode below. We keep using the compact adjacency list to represent our graph.
+```
+for each cell in the partition:
+    for each point in the cell:
+        neighbors = findNeighbors(point)
+        if neighbors.size >= minPts:
+            mark point as core
+    if there is a core point in the cell:
+        mark the cell as core cell
+        for each neighborCell
+            add an edge to graph from cell to neighborCell
+```
+#### Step 3. Graph merging and point labelling
+Now each worker has a partial graph at hand, we use a two-level shallow tree to gradually combine them into a full cell graph. Basically, worker with odd id pass its graph to its previous worker, worker with even id combines two graph and pass to master, master is responsible for generating a global cell graph. 
+
+Point labelling is for core cells is straightforward according to Lemma 1 and 2, we use BFS to two find connected cells and they belong to the same clusters. 
+Point labelling for non-core cell is indirect which requires considering points one by one as shown in the pseudocode below. (With Lemma 3)
+```
+for each non-core cell:
+    for each point in the cell:
+        neighbors = findNeighbors(points)
+        for neighbor in neighbors:
+            if neighbor is a core point:
+                label point the same as its neighbor
+                break
+```
 
 ## Results
 For comparison, we use `sklearn.cluster.DBSCAN`, which is implemented in Cython and accelerated using `k-D tree` by default, and by specifying `n_jobs=-1`, we could utilize all processors. We also implmented a sequential version in `c++` as another baseline. 
