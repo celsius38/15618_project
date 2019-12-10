@@ -225,11 +225,12 @@ While there is great speedup of our CUDA version DBSCAN, the performance is rest
 
 Inspired by one of the most recent research RP-DBSCAN targeted for MapReduce platform, we proposed and implemented a hybrid CUDA MPI version.
 
-In CUDA version, we split into two stages, namely graph construction and BFS, however, this workflow is not suitable for MPI since both stages are not computation insensitive, and communication cost will be overwhelmed. Hence, we changed it into three steps work partitioning, partial graph construction and graph merging.
+In CUDA version, we split into two stages, namely graph construction and BFS, however, this workflow is not suitable for MPI since both stages are not computation insensitive, and communication cost will be overwhelmed. Hence, we changed it into three steps, namely work partitioning, partial graph construction and graph merging.
 
 Let’s first dive into two techniques applied, and then introduce the details of each steps.
+
 #### Technique 1. random partitioning
-One of the key problems is loading balancing, a great number of DBSCAN algorithms tend to assign continuous area to workers, which will cause serious load imbalance especially on skewed dataset. Since cell is relatively small grain compared to the whole space, by randomly assign cells to workers, we can achieve nearly perfect load balancing. We can see from the two graphs below, area will the same color will be assigned to the same worker, the left one is continuous assignment and the blue worker will have higer workload than others, while the right one is random assignment based on small cells and four workers have relatively the same workload.
+One of the key problems is loading balancing, a great number of DBSCAN algorithms tend to assign continuous area to workers, which will cause serious load imbalance especially on skewed dataset. Since cell is relatively small grain compared to the whole space, by randomly assign cells to workers, we can achieve nearly perfect load balancing. We can see from the two graphs below, area will the same color will be assigned to the same worker, the right one is continuous assignment and the blue worker will have higer workload than others, while the left one is random assignment based on small cells and four workers have relatively the same workload.
 ![inbalance](image/inbalance2.png) ![balance](image/inbalance.png)
 #### Technique 2. cell graph 
 Split space into cells whose diagonal is eps, we can use three lemmas which greatly accelerate the algorithm:
