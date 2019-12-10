@@ -7,6 +7,7 @@
 #include <queue>
 #include <unordered_map>
 #include <unordered_set>
+#include "timing.h"
 
 #define MASTER 0
 
@@ -57,6 +58,7 @@ public:
                 std::vector<int> &labels, 
                 float eps, 
                 size_t minPts) {
+    	Timer t;
         labels.resize(points.size(), -1);
         // other workers' cluster count will not be changed
         // indicate main function its identity
@@ -69,10 +71,16 @@ public:
         createMPICell();
 
         // Stage 1: data partition
+        t.reset();
         setup(points, eps, minPts);
         construct_global_graph(&params, point_index, cell_index, cell_start_index, cell_end_index);
         std::vector<int> local_cell_index = random_split(numtasks, taskid);
         size_t local_cell_count = local_cell_index.size();
+
+        double workPartitoningTime = t.elapsed();
+        if(taskid == MASTER) {
+        	printf("step 1. work partitoning time: %.6fms\n", workPartitoningTime);
+        }
 
         // Stage 2: build local clustering
         std::vector<size_t> local_point_id;
@@ -80,12 +88,16 @@ public:
         std::vector<size_t> local_adj_list;
         std::vector<Cell> local_partition;
 
+        t.reset();
         constructLocalCellGraph(local_cell_index,
                                  local_point_id,
                                  local_point_is_core,
                                  local_adj_list,
                                  local_partition);
-
+        double constructGraphTime = t.elapsed();
+        if(taskid == MASTER) {
+        	printf("step 2. partial cell graph construction: %.6fms\n", constructGraphTime);
+        }
 
         size_t local_point_count = local_point_id.size();
         size_t local_adj_list_len = local_adj_list.size(); 
@@ -109,6 +121,7 @@ public:
             std::unordered_map<size_t, short> point_is_core_map; 
             addIntoMap(point_is_core_map, local_point_id, local_point_is_core);
             // TODO: tree like merge
+            t.reset();
             for(int i = 1; i < numtasks; i++) {
                 // receive a cell graph
                 size_t other_adj_list_len;
@@ -147,12 +160,21 @@ public:
                 // TODO add into point_is_core_map
                 addIntoMap(point_is_core_map, other_point_id, other_point_is_core);
             }
+            double mergeGraphTime = t.elapsed();
+        	if(taskid == MASTER) {
+        		printf("step 3.1. merge graph time: %.6fms\n", mergeGraphTime);
+        	}
+        	t.reset();
             // local_partition and local_adj_list for master now is the global graph
             std::vector<int> cell_cluster_id(local_partition.size(), 0);
             cluster_count = labelCoreCells(local_partition, local_adj_list, cell_cluster_id);
             labelPointsInCoreCells(cell_cluster_id, labels);
             // TODO label points in non core cells
             labelPointsInNonCoreCells(cell_cluster_id, point_is_core_map, labels);
+            double labelTime = t.elapsed();
+        	if(taskid == MASTER) {
+        		printf("step 3.2. label points time: %.6fms\n", labelTime);
+        	}
         }
 
         MPI_Type_free(&MPI_Cell);
