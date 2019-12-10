@@ -33,7 +33,7 @@ std::string plainScannerType(ScannerType type) {
         case ScannerType::Sequential:
             return "sequential";
         case ScannerType::Gdbscan:
-            return "GDBSCAN";
+            return "Gdbscan";
         case ScannerType::RPdbscan:
             return "RPdbscan";
     }

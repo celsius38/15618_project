@@ -83,10 +83,12 @@ public:
 
         // Stage 1: data partition
         setup(points, eps, minPts);
+        std::cout << "setup finished" << std::endl;
         construct_global_graph(&params, point_index, cell_index, cell_start_index, cell_end_index);
+        std::cout << "construct global graph finished" << std::endl;
         std::vector<int> local_cell_index = random_split(numtasks, taskid);
         size_t local_cell_count = local_cell_index.size();
-
+        std::cout << "stage 1 finished" << std::endl;
         // Stage 2: build local clustering
         std::vector<size_t> local_adj_list;
         std::vector<Cell> local_partition;
@@ -182,7 +184,6 @@ private:
     size_t* cell_end_index;
 
     void setup(std::vector<Vec2> &points, float eps, size_t min_points) {
-        this->points = points;
         params.eps = eps;
         params.min_points = min_points;
         params.num_points = points.size();
@@ -205,10 +206,14 @@ private:
         params.num_cells = params.row_cells * params.col_cells;
 
         // allocate host data
-        params.point_index = new size_t[params.num_points];
-        params.cell_index = new size_t[params.num_points];
-        params.cell_start_index = new size_t[params.num_cells];
-        params.cell_end_index = new size_t[params.num_cells];
+        this -> points = points;
+        this -> point_index = new size_t[params.num_points];
+        this -> cell_index = new size_t[params.num_points];
+        this -> cell_start_index = new size_t[params.num_cells];
+        this -> cell_end_index = new size_t[params.num_cells];
+        std::cout << "setup host success" << std::endl;
+
+        // set up device data
         setup_device(&params, points);
     }
 
