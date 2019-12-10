@@ -6,6 +6,7 @@
 #include <vector>
 #include <queue>
 #include <unordered_map>
+#include <unordered_set>
 
 #define MASTER 0
 
@@ -21,16 +22,6 @@ public:
     size_t start_index;
 };
 
-
-// TODO
-/*
-void
-construct_partial_cell_graph(
-    vector<int> partition,
-    std::vector<size_t>& ret_point_ids, std::vector<short>& ret_point_is_core,
-    std::vector<Cell>& ret_cells, std::vector<size_t>& ret_cell_adj_list
-);
-*/
 void construct_global_graph(HyperParameters* params, size_t* point_index, size_t* cell_index, size_t* cell_start_index, size_t* cell_end_index);
 void setup_device(HyperParameters* params, std::vector<Vec2> &points);
 
@@ -97,10 +88,13 @@ public:
         std::vector<size_t> local_adj_list;
         std::vector<Cell> local_partition;
 
-        //TODO: construct_partial_cell_graph(
-            //local_cell_index, 
-            //local_point_id, local_point_is_core,
-            //local_partition, local_adj_list);
+        constructLocalCellGraph(local_cell_index,
+                                 local_point_id,
+                                 local_point_is_core,
+                                 local_adj_list,
+                                 local_partition);
+
+
         size_t local_point_count = local_point_id.size();
         size_t local_adj_list_len = local_adj_list.size(); 
         std::cout << "stage 2 finished" << std::endl;
@@ -341,22 +335,67 @@ private:
         }
     }
 
+void constructLocalCellGraph(std::vector<int>& local_cell_index,
+                                 std::vector<size_t>& local_point_id,
+                                 std::vector<short>& local_point_is_core,
+                                 std::vector<size_t>& local_adj_list,
+                                 std::vector<Cell>& local_partition){
+        for(int i = 0; i < local_cell_index.size(); ++i){
+            int cid = local_cell_index[i];
+            std::unordered_set<size_t> cell_neighbour_cells;
+            Cell cell;
+            cell.is_core = 0;
+            cell.id = cid;
+            cell.degree = 0;
+            cell.start_index = 0;
+            for(size_t j = cell_start_index[cid]; j < cell_end_index[cid]; ++j){
+                size_t pid = point_index[j]; 
+                local_point_id.push_back(pid);
+
+                std::vector<size_t> neighbour_points;
+                std::vector<size_t> neighbour_cells;
+                findNeighbours(pid, cid, neighbour_points, neighbour_cells); 
+                if(neighbour_points.size() >= params.min_points){
+                    local_point_is_core.push_back(1);
+                    for(size_t k = 0; k < neighbour_points.size(); ++k){
+                        size_t npid = neighbour_points[k];
+                        size_t ncid = neighbour_cells[k];
+                        cell_neighbour_cells.insert(ncid);
+                    }
+                    cell.is_core = 1;
+                }else{
+                    local_point_is_core.push_back(0);
+                }
+            }
+            cell.degree = cell_neighbour_cells.size(); 
+            if(cell.is_core){
+                cell.start_index = local_adj_list.size();
+                local_adj_list.insert(local_adj_list.end(), 
+                                      cell_neighbour_cells.begin(),
+                                      cell_neighbour_cells.end());
+                local_partition.push_back(cell);
+            }
+        }
+    }
+
     void labelPointsInNonCoreCells(std::vector<int>& cell_cluster_id, 
                                     std::unordered_map<size_t, short> point_is_core_map,
                                     std::vector<int>& labels) {
         for(int cell_id = 0; cell_id < cell_cluster_id.size(); cell_id++) {
-            if(cell_cluster_id[cell_id] > 0) {
+            if(cell_cluster_id[cell_id] == 0) {
                 // label one non core cell
                 for(size_t i = cell_start_index[cell_id]; i < cell_end_index[cell_id]; i++) {
                     size_t point_id = point_index[i];
                     // label one point
                     // TODO
-                    std::vector<size_t> neighbours = findNeighbours(point_id, cell_id);
-                    for(size_t neighbour_index = 0; neighbour_index < neighbours.size(); neighbour_index++) {
-                        size_t neighbour_id = neighbours[neighbour_index];
+                    std::vector<size_t> neighbour_points;
+                    std::vector<size_t> neighbour_cells;
+                    findNeighbours(point_id, cell_id, neighbour_points, neighbour_cells);
+                    for(size_t neighbour_index = 0; neighbour_index < neighbour_points.size(); neighbour_index++) {
+                        size_t npid = neighbour_points[neighbour_index];
                         // neighbour is core
-                        if(point_is_core_map[neighbour_id] == 1) {
-                            labels[point_id] = labels[neighbour_id];
+                        if(point_is_core_map[npid] == 1) {
+                            labels[point_id] = labels[npid];
                             break;
                         }
                     }
@@ -364,19 +403,22 @@ private:
             }
         }
     }
-    
-    std::vector<size_t> findNeighbours(size_t point_id, int cell_id) {
-        std::vector<size_t> neighbours;
+    void findNeighbours(size_t point_id, int cell_id,
+                        std::vector<size_t>& neighbour_points,
+                        std::vector<size_t>& neighbour_cells)
+    {
         int cell_row_id = cell_id/params.col_cells;
         int cell_col_id = cell_id%params.col_cells;
         for(int row_diff = -2; row_diff < 3; ++row_diff) {
             for(int col_diff = -2; col_diff < 3; ++col_diff) {
-                addOneCellNeighbours(neighbours, point_id, cell_row_id+row_diff, cell_col_id+col_diff);
+                addOneCellNeighbours(neighbour_points, neighbour_cells, point_id, cell_row_id+row_diff, cell_col_id+col_diff);
             }
         }
     }
 
-    void addOneCellNeighbours(std::vector<size_t>& neighbours, size_t point_id, int cell_row_id, int cell_col_id) {
+    void addOneCellNeighbours(
+            std::vector<size_t>& neighbour_points, std::vector<size_t>& neighbour_cells,
+            size_t point_id, int cell_row_id, int cell_col_id) {
         if(cell_row_id < 0 || cell_row_id > params.row_cells || cell_col_id < 0 || cell_col_id > params.col_cells) {
             return;
         }
@@ -384,7 +426,8 @@ private:
         for(size_t i = cell_start_index[cell_id]; i < cell_end_index[cell_id]; i++) {
             size_t other_point_id = point_index[i];
             if((points[other_point_id]-points[point_id]).length() <= params.eps) {
-                neighbours.push_back(other_point_id);
+                neighbour_points.push_back(other_point_id);
+                neighbour_cells.push_back(cell_id);
             }
         }
     }
