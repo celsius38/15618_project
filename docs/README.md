@@ -141,18 +141,22 @@ binning_kernel()
 
 - Then we sort particle index by cell index, which is implemented in `thrust` as `thrust::sort_by_key`:
 
+
 | particle index | 3 | 5 | 1 | 2 | 4 | 0 |
 |----------------|---|---|---|---|---|---|
 | cell index     | 4 | 4 | 6 | 6 | 6 | 9 |
 
+\
 Now that the `cell index` will be increasing order and `particle index` has the original pairing with `cell index`. 
 
 - The third step, we compute the start and end index for each of the cell in the particle - cell index table, so that we could easily find all point indices in a given cell:
+
 
 | cell id     | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 |
 |-------------|---|---|---|---|---|---|---|---|---|---|
 | cell starts | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 5 |
 | cell ends   | 0 | 0 | 0 | 0 | 2 | 0 | 5 | 0 | 0 | 6 |
+
 ```
 __global__ void
 find_bin_start_kernel()
@@ -207,15 +211,19 @@ degree_kernel(){
 
 Then `thrust::exclusive_scan` to get the `start_index` in the `adj_list` for each point:
 
+
 | point id | 0 | 1 | 2 | 3 | 4 | 5  |
 |----------|---|---|---|---|---|----|
 | start index| 0 | 1 | 4 | 7 | 9 | 12 |
 
+
 And finally, we scan for each point its neighbors in surrounding cells again to get the final `adj_list`:
+
 
 | point id  | 0 | 1 |   |   | 2 |   |   | 3 |   | 4 |   |   | 5 |
 |-----------|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | neighbors | 0 | 1 | 2 | 4 | 1 | 2 | 4 | 3 | 5 | 1 | 2 | 4 | 3 |
+
 
 #### BFS
 The bfs part stays the same as in naive `G-DBSCAN`
