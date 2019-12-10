@@ -286,8 +286,8 @@ for each non-core cell:
 ```
 
 ## Results
-First of all, for the last approach `RP-DBSCAN`, although we have all MPI and CUDA codes setup, we could not trace a down one bug and thus we currently could not provide its performance analysis. Otherwise, we adapt `G-DBSCAN` to CUDA well and improve it through data parallelism.
 
+### CUDA version Speedup
 For comparison, we use `sklearn.cluster.DBSCAN`, which is implemented in Cython and accelerated using `k-D tree` by default, and by specifying `n_jobs=-1`, we could utilize all processors. We also implmented a sequential version in `c++` as another baseline. 
 
 We adapt the more classis test cases from [RP-DBSCAN], but also invent some test cases ourselves to really push the limit as all classic test cases only have 100,000 points.
@@ -317,6 +317,16 @@ We also come up with some test cases our own: random and rings, basically the fo
 | random-10000            | 112.55                     | 118.40                     | 211.66   |
 | random-100000           | 182.39                     | 3645.03                    | 16317.20 |
  
+### MPI version load balancing and breakdown of time
+We did not include the MPI verison in the above comparison, since the speedup of MPI on one machine did not outperform the CUDA version. But there are serveral things deserve to be highlighted:
+
+With random partioning technique, each worker is relatively assigned the same amount of work as we can see from the graph below, which is the time to construct partial cell graph.
+![](image/loadbalance.png)
+
+With cell graph, we can see labelling process is pretty fast in the blue part below. Partial graph construction can be further improved by using CUDA on each machine. Merge graph can be further improved by tree like merge instead of master as a single point. Work partition part is the most consuming one while it has great benefit for later stages.
+![](image/timesplit.png)
+
+
 ## Work Distribution
 Yueni Liu and Sailun Xu contribute equally in this project on all parts.
 
