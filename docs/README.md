@@ -229,22 +229,18 @@ In CUDA version, we split into two stages, namely graph construction and BFS, ho
 
 Let’s first dive into two techniques applied, and then introduce the details of each steps.
 #### Technique 1. random partitioning
-One of the key problems is loading balancing, a great number of DBSCAN algorithms tend to assign continuous area to workers, which will cause serious load imbalance especially on skewed dataset. Since cell is relatively small grain compared to the whole space, by randomly assign cells to workers, we can achieve nearly perfect load balancing.
+One of the key problems is loading balancing, a great number of DBSCAN algorithms tend to assign continuous area to workers, which will cause serious load imbalance especially on skewed dataset. Since cell is relatively small grain compared to the whole space, by randomly assign cells to workers, we can achieve nearly perfect load balancing. We can see from the two graphs below, area will the same color will be assigned to the same worker, the left one is continuous assignment and the blue worker will have higer workload than others, while the right one is random assignment based on small cells and four workers have relatively the same workload.
 ![inbalance](image/inbalance2.png) ![balance](image/inbalance.png)
 #### Technique 2. cell graph 
 Split space into cells whose diagonal is eps, we can use three lemmas which greatly accelerate the algorithm:
 
-Lemma 1: If there is a core point in the cell, all points in the cell belong to the same cluster.
+Lemma 1: If there is a core point in the cell, all points in the cell belong to the same cluster. (As shown in the left most graph below, all points in C1 are in the same cluster.)
 
-![lemma1](image/lemma1.png)
+Lemma 2: If cell 1 and cell 2 are core cells (there is a core point in the cell), and one core point p in cell 1 has a neighbor in cell 2, then all points in cell 1 and cell 2 belong to the same cluster. (As shown in the middle graph below) 
 
-Lemma 2: If cell A and cell B are core cells (there is a core point in the cell), and one core point a in cell A has a neighbor in cell B, then all points in cell A and cell B belong to the same cluster.
+Lemma 3: If cell 1 is a core cell, cell 2 is a non-core cell, and one core point p in cell 1 has a neighbor q in cell 2, then q belongs to the same cluster as cell 1. (As shown in the right graph below)
 
-![lemma2](image/lemma2.png)
-
-Lemma 3: If cell A is a core cell, cell B is a non-core cell, and one core point a in cell A has a neighbor b in cell B, then b belongs to the same cluster as cell A.
-
-![lemma3](image/lemma3.png)
+![lemma1](image/lemma1.png) ![lemma2](image/lemma2.png) ![lemma3](image/lemma3.png)
 
 Having these three lemmas at hand we can confidently build a graph whose nodes are the entire cells instead of individually points.
 #### Step 1. Work partitioning 
