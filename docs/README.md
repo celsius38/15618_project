@@ -239,7 +239,10 @@ Let’s first dive into two techniques applied, and then introduce the details o
 
 #### Technique 1. random partitioning
 One of the key problems is loading balancing, a great number of DBSCAN algorithms tend to assign continuous area to workers, which will cause serious load imbalance especially on skewed dataset. Since cell is relatively small grain compared to the whole space, by randomly assign cells to workers, we can achieve nearly perfect load balancing. We can see from the two graphs below, area will the same color will be assigned to the same worker, the right one is continuous assignment and the blue worker will have higer workload than others, while the left one is random assignment based on small cells and four workers have relatively the same workload.
+  
 ![inbalance](image/inbalance2.png) ![balance](image/inbalance.png)
+
+
 #### Technique 2. cell graph 
 Split space into cells whose diagonal is eps, we can use three lemmas which greatly accelerate the algorithm:
 
