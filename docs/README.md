@@ -275,6 +275,8 @@ for each non-core cell:
 ```
 
 ## Results
+First of all, for the last approach `RP-DBSCAN`, although we have all MPI and CUDA codes setup, we could not trace a down one bug and thus we currently could not provide its performance analysis. Otherwise, we adapt `G-DBSCAN` to CUDA well and improve it through data parallelism.
+
 For comparison, we use `sklearn.cluster.DBSCAN`, which is implemented in Cython and accelerated using `k-D tree` by default, and by specifying `n_jobs=-1`, we could utilize all processors. We also implmented a sequential version in `c++` as another baseline. 
 
 We adapt the more classis test cases from [RP-DBSCAN], but also invent some test cases ourselves to really push the limit as all classic test cases only have 100,000 points.
@@ -290,50 +292,19 @@ We see that `sklearn.cluster.DBSCAN` got killed here (although we didn't find a 
 ![](image/blobs.png)
 
 
-We also come up with some test cases our own:
+We also come up with some test cases our own: random and rings, basically the former one is sampled from uniform distribution and the latter one is sampled from a ring with gaussian noise. We have 3 different sizes: `1000`, `10,000` and `100,000` for each case. We summarize the performance below:
 
+|               | gdbscan(ms) | ref(ms)     | seq(ms)     |
+|---------------|---------|---------|----------|
+| rings-1000    | 147.05  | 6.46    | 5.91     |
+| rings-10000   | 98.07   | 175.02  | 262.81   |
+| rings-100000  | 349.97  | 5928.06 | 19081.30 |
+| random-1000   | 144.36  | 5.28    | 2.88     |
+| random-10000  | 112.55  | 118.40  | 211.66   |
+| random-100000 | 182.39  | 3645.03 | 16317.20 |
 
-
-## Updated Schedule
-So far, we have kept pace with the planned schedule. Specifically, we now have a working version of sequential version, a G-DBSCAN and the python `sklearn` package implementation as reference
-
-| Week| Goal| Detail| Progress|
-|-----|-----|-------|---------|
-| Week 1(10/29-11/05) | Research | Write proposal, read related paper and implement sequential version. | Done |
-| Week 2(11/05-11/12) | 1st Parallel Implementation        | Implement G-DBSCAN with CUDA and do analysis. | Done |
-| Week 3(11/12-11/19) | Checkpoint!         | Check point report | Done |
-| Week 4(11/19-11/26) | G-DBSCAN speed & <br> MPI version draft                       |  1. N-Body data-parallel approach to neighbor construction (Sailun) <br> 2. K-D tree approach to neighbor construction(Yueni) <br> 3. Drafting MPI approach to RP-DBSCAN(both)               | TODO |
-| Week 5(11/26-12/03) | MPI version finalize & <br> Performance analysis               | 1. Implement full [RP-DBSCAN] with MPI and all relevant tricks(Sailun) <br> 2. Fine tune each algorithm and optimize the relevant hyperparameters(Yuenil) <br> 3. Design more test cases, and anlyze the effect of `epsilon` and `minPts` on different algorithms(Yueni) | TODO |
-| Week 6(12/03-12/10) | Final Report <br> Poster <br>  | 1. Run a grid of experiments setting configurations, and draw graphs for comparison (both) <br> 2. Final report (both) <br> 3. Poster(both) | TODO |
-
-
-
-As mentioned before, we have so far kept pace with the planned schedule, but largely due to that all algorithms we have implemented so far are on the relatively easy side, and the true challenge will be [RP-DBSCAN] and we expect to spend roughly two weeks on that. Also, we expect to improve the [G-DBSCAN] by using either the k-d tree or the N-Body data-parallel approach mentioned in the lecture.
-
-For the poster session: we plan to explain our approach to the problem, and the optimizations/tricks we have used throughout the implementation. We will also show graphs which compare the various aspects (speedup, time breakdown, load balance, scalability, and memory footprint) of different scan algorithms on different scenario.
-
-## Preliminary Result and Issues
-We start from scratch and build a workflow of:   
-
-* implementing a new scan algorithm class that inherits the pure virtual base class `DBScanner`, so far we have built:
-	* `SequentialDBScanner`: a naive implementation where we build `neighbors` by going through every pair of points (a complexity of `O(n^2)`), then we simply find all connected parts by performing BFS
-	* `Seq2DBScanner`: a sequential version of the algorithm mentioned in [G-DBSCAN], notably, it performs worse than the `SequentialDBScanner` for seeking the possibility of parallelization.
-	* `ParallelDBScanner`: a cuda version of the [G-DBSCAN], which utilizes a compact adjacency list to represente the graph. Both graph construction (exlusive scan with Thrust library) and cluster identification (BFS with level synchronization) is parallized. 
-	* `RefScanner`: basically we invoke the `sklearn.cluster.DBSCAN`. For reference, this version includes a k-d tree for building `neighbors` faster (`O(n^2)` on average, and `O(n*log n)` empirically). Also, the BFS procedure is optimized using `Cython` (`c` extension for `python`).
-* including a new test case with different number of points and scatter pattern, so far we have the following test cases:
-	* `random-{k}` where `k` in `{1e3, 1e4, 1e5, 1e6}`, we sample uniformly randomly from the `([-10,10], [-10, 10])`.
-	We are expecting to build more test cases such as `ring`, `mixture`, but so far we only use the random case for testing the correctness by checking the output labels of our scanner against the `RefScanner`.
-
-The following is a summary of the runtime (in `ms`) of each of the combination of (`scannerType`, `testCase`):
-
-|   |RefScanner | ParallelDBScanner | SequentialScanner | Seq2DBScanner |
-|---|-----|-----|-----|------|    
-|random-1000|12.661934| 1020.34|**4.78667**|12.2835|
-|random-10000|**115.019083**|139.35|206.94000|454.4650|
-|random-100000.in|3408.552885|**468.22**|13815.60000|40600.5000|
-
-Due to the small overhead, `SequentialScanner` performs the best for 1000 points, but `RefScanner` and `ParallelDBScanner` performs better on larger problems. Yet we have not include either the k-d tree/N-body data-parallel approach to speed up the `neighbors` construction yet, we expect that to bring even more advantage for `ParallelDBScanner` and set a strong baseline.  
-Also we notice a dubious large runtime for `ParallelDBScanner` on `random-1000`, we will further look into it this week.
+## Work Distribution
+Yueni Liu and Sailun Xu contribute equally in this project on all parts.
 
 ## References
 
