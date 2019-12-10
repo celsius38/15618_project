@@ -220,9 +220,54 @@ And finally, we scan for each point its neighbors in surrounding cells again to 
 #### BFS
 The bfs part stays the same as in naive `G-DBSCAN`
 
-
 ### RP-DBSCAN
+While there is great speedup of our CUDA version DBSCAN, the performance is restricted by single machine. That's why we turn into MPI for large dataset.
 
+Inspired by one of the most recent research RP-DBSCAN targeted for MapReduce platform, we proposed and implemented a hybrid CUDA MPI version.
+
+In CUDA version, we split into two stages, namely graph construction and BFS, however, this workflow is not suitable for MPI since both stages are not computation insensitive, and communication cost will be overwhelmed. Hence, we changed it into three steps work partitioning, partial graph construction and graph merging.
+
+Let’s first dive into two techniques applied, and then introduce the details of each steps.
+#### Technique 1. random partitioning
+One of the key problems is loading balancing, a great number of DBSCAN algorithms tend to assign continuous area to workers, which will cause serious load imbalance especially on skewed dataset. Since cell is relatively small grain compared to the whole space, by randomly assign cells to workers, we can achieve nearly perfect load balancing.
+#### Technique 2. cell graph 
+Split space into cells whose diagonal is eps, we can use three lemmas which greatly accelerate the algorithm:
+Lemma 1: If there is a core point in the cell, all points in the cell belong to the same cluster.
+
+Lemma 2: If cell A and cell B are core cells (there is a core point in the cell), and one core point a in cell A has a neighbor in cell B, then all points in cell A and cell B belong to the same cluster.
+
+Lemma 3: If cell A is a core cell, cell B is a non-core cell, and one core point a in cell A has a neighbor b in cell B, then b belongs to the same cluster as cell A.
+
+Having these three lemmas at hand we can confidently build a graph whose nodes are the entire cells instead of individually points.
+#### Step 1. Work partitioning 
+Partitioning the space into cells whose diagonal is eps and assign points to its cell. This process is similarly to the data parallel part introduced above. Cells are split into n partitions randomly and n is the number of workers in MPI.
+#### Step 2. Partial graph construction
+In this stage, we mark cells and points in the partition as core/non-core and construct a cell graph as shown in the pseudocode below. We keep using the compact adjacency list to represent our graph.
+```
+for each cell in the partition:
+    for each point in the cell:
+        neighbors = findNeighbors(point)
+        if neighbors.size >= minPts:
+            mark point as core
+    if there is a core point in the cell:
+        mark the cell as core cell
+        for each neighborCell
+            add an edge to graph from cell to neighborCell
+```
+#### Step 3. Graph merging and point labelling
+Now each worker has a partial graph at hand, we use a two-level shallow tree to gradually combine them into a full cell graph. Basically, worker with odd id pass its graph to its previous worker, worker with even id combines two graph and pass to master, master is responsible for generating a global cell graph. 
+
+Point labelling is for core cells is straightforward according to Lemma 1 and 2, we use BFS to two find connected cells and they belong to the same clusters. 
+Point labelling for non-core cell is indirect which requires considering points one by one as shown in the pseudocode below. (With Lemma 3)
+```
+for each non-core cell:
+    for each point in the cell:
+        neighbors = findNeighbors(points)
+        for neighbor in neighbors:
+            if neighbor is a core point:
+                label point the same as its neighbor
+                break
+```
 
 ## Results
 ## Updated Schedule
