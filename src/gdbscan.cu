@@ -55,27 +55,10 @@ __global__ void
 check_cuda_const(){
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     if(i==0){
-        printf("cuda: sizeof(float) = %ld\n", (unsigned long)sizeof(float));
-        printf("cuda: sizeof(size_t) = %ld\n", (unsigned long)sizeof(size_t));
-        printf("cuda: eps: %f, min_points: %lu, " 
-                "num_points: %lu, adj_list_size: %lu\n" 
-                "points:%p, degree: %p, start_index: %p, adj_list: %p\n",
-                (float)cuConstParams.eps,
-                (size_t)cuConstParams.min_points,
-                (size_t)cuConstParams.num_points, 
-                (size_t)cuConstParams.adj_list_size,
-                (void*)cuConstParams.points,
-                (void*)cuConstParams.degree, 
-                (void*)cuConstParams.start_index,
-                (void*)cuConstParams.adj_list); 
-        printf("cuda: points[0]: (%f,%f), points[999]: (%f, %f)\n", 
-                cuConstParams.points[0], 
-                cuConstParams.points[1], 
-                cuConstParams.points[1998], 
-                cuConstParams.points[1999]);
-        printf("cuda: degree[0]: %d, degree[999]: %d\n", 
-                cuConstParams.degree[0],
-                cuConstParams.degree[999]);
+        for(int j = 0; j < 10; ++j){
+            printf("%lu %lu\n", cuConstParams.bin_start_index[j],
+                                cuConstParams.bin_end_index[j]);
+        }
     }
 }
 
@@ -450,7 +433,7 @@ GDBScanner::construct_graph(){
     thrust::sort_by_key(thrust::device, 
                         device_bin_index, device_bin_index + num_points, 
                         device_point_index); 
-    find_bin_start_kernel<<<blocks,THREADS_PER_BLOCK>>>(); 
+    find_bin_start_kernel<<<blocks,THREADS_PER_BLOCK>>>();
 
     // calculate degree
     degree_kernel<<<blocks, THREADS_PER_BLOCK>>>();

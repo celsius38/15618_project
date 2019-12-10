@@ -83,27 +83,27 @@ public:
 
         // Stage 1: data partition
         setup(points, eps, minPts);
-        std::cout << "setup finished" << std::endl;
         construct_global_graph(&params, point_index, cell_index, cell_start_index, cell_end_index);
-        std::cout << "construct global graph finished" << std::endl;
         std::vector<int> local_cell_index = random_split(numtasks, taskid);
         size_t local_cell_count = local_cell_index.size();
+        for(size_t i = 0; i < 10; ++i){
+            std::cout << cell_start_index[i] << " " << cell_end_index[i] << std::endl;
+        }
         std::cout << "stage 1 finished" << std::endl;
+
         // Stage 2: build local clustering
+        std::vector<size_t> local_point_id;
+        std::vector<short> local_point_is_core;
         std::vector<size_t> local_adj_list;
         std::vector<Cell> local_partition;
 
-        std::vector<size_t> local_point_id;
-        std::vector<short> local_point_is_core;
-        // TODO
-        /*
-        construct_partial_cell_graph(
-            local_cell_index, 
-            local_point_id, local_point_is_core,
-            local_partition, local_adj_list);
-            */
+        //TODO: construct_partial_cell_graph(
+            //local_cell_index, 
+            //local_point_id, local_point_is_core,
+            //local_partition, local_adj_list);
         size_t local_point_count = local_point_id.size();
-        size_t local_adj_list_len = local_adj_list.size();
+        size_t local_adj_list_len = local_adj_list.size(); 
+        std::cout << "stage 2 finished" << std::endl;
 
         // Stage 3: merge clustering
         if(taskid != MASTER) {
