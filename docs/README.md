@@ -294,6 +294,9 @@ We see that `sklearn.cluster.DBSCAN` got killed here (although we didn't find a 
 
 We also come up with some test cases our own: random and rings, basically the former one is sampled from uniform distribution and the latter one is sampled from a ring with gaussian noise. We have 3 different sizes: `1000`, `10,000` and `100,000` for each case. We summarize the performance below:
 
+![](image/rings.png)
+![](image/random.png)
+
 |               | gdbscan(ms) | ref(ms)     | seq(ms)     |
 |---------------|---------|---------|----------|
 | rings-1000    | 147.05  | 6.46    | 5.91     |
