@@ -403,6 +403,7 @@ void constructLocalCellGraph(std::vector<int>& local_cell_index,
             }
         }
     }
+
     void findNeighbours(size_t point_id, int cell_id,
                         std::vector<size_t>& neighbour_points,
                         std::vector<size_t>& neighbour_cells)
@@ -419,7 +420,7 @@ void constructLocalCellGraph(std::vector<int>& local_cell_index,
     void addOneCellNeighbours(
             std::vector<size_t>& neighbour_points, std::vector<size_t>& neighbour_cells,
             size_t point_id, int cell_row_id, int cell_col_id) {
-        if(cell_row_id < 0 || cell_row_id > params.row_cells || cell_col_id < 0 || cell_col_id > params.col_cells) {
+        if((cell_row_id < 0) || (cell_row_id >= params.row_cells) || (cell_col_id < 0) || (cell_col_id >= params.col_cells)) {
             return;
         }
         int cell_id = cell_row_id * params.col_cells + cell_col_id;

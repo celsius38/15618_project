@@ -17,6 +17,8 @@ setup_device(HyperParameters* params, std::vector<Vec2> &points) {
     cudaMalloc(&params->cell_index, sizeof(size_t)*params->num_points);
     cudaMalloc(&params->cell_start_index, sizeof(size_t)*params->num_cells);
     cudaMalloc(&params->cell_end_index, sizeof(size_t)*params->num_cells);
+    cudaMemset(&params->cell_start_index, 0, sizeof(size_t)*params->num_cells);
+    cudaMemset(&params->cell_end_index, 0, sizeof(size_t)*params->num_cells);
 
     // copy points to device
     cudaMemcpy(params->points, (float*)points.data(), sizeof(float)*2*params->num_points, cudaMemcpyHostToDevice);
