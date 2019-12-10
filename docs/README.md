@@ -29,7 +29,7 @@ Naively implemented, the first step has a complexity of $O(n^2)$ as we have to i
 
 
 ### DBSCAN break-down
-First of all, we notice that the first step is a very typical *N-body problem*, where given a point we want to find all points within radius of $\epsilon$, and the key idea is to either use some tree structures to partition the space and eliminate sub-spaces too far away from the point of interest. This we actually have seen in `Assignment 3` and `Assignment 4`, and in addition to *quad-tree*, we could also use *k-d tree*, which is a little bit more involved but the ideas are the same. Since we have done *quad-tree* before, we decided to take the *data-parallel* approach introduced in `Lecture 7` but we have never actually implemented. Also, this part is exactly where the original [G-DBSCAN] algorithm is lacking and we hope to see a performance boost from `data-parallel`.
+First of all, we notice that the first step is a very typical *N-body problem*, where given a point we want to find all points within radius of $\epsilon$, and the key idea is to either use some tree structures to partition the space and eliminate sub-spaces too far away from the point of interest. This we actually have seen in *Assignment 3* and *Assignment 4*, and in addition to *quad-tree*, we could also use *k-d tree*, which is a little bit more involved but the ideas are the same. Since we have done *quad-tree* before, we decided to take the *data-parallel* approach introduced in *Lecture 7* but we have never actually implemented. Also, this part is exactly where the original [G-DBSCAN] algorithm is lacking and we hope to see a performance boost from `data-parallel`.
 
 The graph construction part could also be parallelized by distributing the work to different workers through MPI. Each `worker` would only be constructing a subset of all points and `master` will collect the result and merge all different sub-graphs constructed by each `worker`. This is actually more invovled and we will actually be constructing the graph on cells instead of on points and we will defer the discussion until we introduce [RP-DBSCAN]
 
@@ -62,13 +62,164 @@ degree_kernel(...) {
 ```
 To speed up the loading, we convert the point to `float2` and load one `float2` at a time from the `points`. Also, to prevent copying back and forth between `host` and `device`, we try to keep all data all `device`, and also specifying the execution policy of `thrust` to be `thrust::device`.
 
-After we have the degree of each vertex, 
+After we have the degree of each vertex, we could then do a `thrust::exlusive_scan` to get the start index in the adjacency list for each of the point. We then scan again to fill in the adjacency list.
+
+```
+__global__ void
+adj_list_kernel()
+{
+	int v = blockIdx.x * blockDim.x + threadIdx.x;
+	if( v >= num_points) return;
+	size_t cur_index = vertex_start_index[v];
+	float2 p1 = ((float2*)points)[v];
+	for(size_t i = 0; i < N; i++) {
+		float2 p2 = ((float2*)points)[i];
+		if(distance(p1,p2) <= eps){
+			adj_list[cur_index] = i;
+			cur_index++;
+		}
+	}
+}
+
+...	thrust::exclusive_scan(thrust::device, device_degree, device_degree + num_points, device_start_index);
+
+```
 
 #### BFS:
 
+In this stage, we have a 0/1 vector `border` indicating whether we should visit every point at current level, and we keep looping until `border.isEmpty()`
+
+```[c++]
+__global__ void
+bfs_kernel(size_t* boarder, int* labels, int cluster_id) {
+	int j = blockIdx.x * blockDim.x + threadIdx.x;
+	if (j < cuConstParams.N) {
+	if(!border[j]) return;
+	border[j] = 0;
+	labels[j] = cluster_id;
+	// we reach a non-core point
+	if(cuConstParams.vertex_degree[j] < cuConstParams.minPts) return;
+	size_t start_index = cuConstParams.vertex_start_index[j];
+	size_t end_index = start_index + cuConstParams.vertex_degree[j];
+	for(size_t neighbor_index = start_index; neighbor_index < end_index; neighbor_index++) {
+		size_t neighbor = cuConstParams.adj_list[neighbor_index];
+		if(labels[neighbor] <= 0) { // either previously marked as noise or not yet visited
+			border[neighbor] = 1;
+		}
+	}
+}
+```
 
 ### G-DBSCAN Data Parallel
+
 #### Graph construction:
+In G-DBSCAN Data Parallel implementation, we use data-parallel approach introduced in *Lecture 7*. So basically each point will be in exactly one bin where the side length of each bin is $\epsilon$
+
+Using the following example from lecture:
+![](image/point_grid.png)
+
+- First we parallel over point and assign each point to a unique cell:
+
+| particle index | 0 | 1 | 2 | 3 | 4 | 5 |
+|----------------|---|---|---|---|---|---|
+| cell index     | 9 | 6 | 6 | 4 | 6 | 4 |
+```[c++]
+__global__ void
+binning_kernel()
+{
+    int v = blockIdx.x * blockDim.x + threadIdx.x;
+    if(v >= cuConstParams.num_points) return;
+    float2 point = ((float2*)(cuConstParams.points))[v];
+    float side = cuConstParams.side;
+    int col_idx = (point.x - cuConstParams.min_x)/side;
+    int row_idx = (point.y - cuConstParams.min_y)/side;
+    cuConstParams.bin_index[v] = row_idx * cuConstParams.col_bins + col_idx;
+    cuConstParams.point_index[v] = v;
+}
+
+```
+
+- Then we sort particle index by cell index, which is implemented in `thrust` as `thrust::sort_by_key`:
+
+| particle index | 3 | 5 | 1 | 2 | 4 | 0 |
+|----------------|---|---|---|---|---|---|
+| cell index     | 4 | 4 | 6 | 6 | 6 | 9 |
+
+Now that the `cell index` will be increasing order and `particle index` has the original pairing with `cell index`. 
+
+- The third step, we compute the start and end index for each of the cell in the particle - cell index table, so that we could easily find all point indices in a given cell:
+
+| cell id     | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 |
+|-------------|---|---|---|---|---|---|---|---|---|---|
+| cell starts | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 5 |
+| cell ends   | 0 | 0 | 0 | 0 | 2 | 0 | 5 | 0 | 0 | 6 |
+```
+__global__ void
+find_bin_start_kernel()
+{
+    int v = blockIdx.x * blockDim.x + threadIdx.x;
+    if(v >= cuConstParams.num_points) return;
+    int bin_idx = cuConstParams.bin_index[v];
+    // first cell
+    if(v == 0){ 
+        cuConstParams.bin_start_index[bin_idx] = 0;
+    }
+    // mark start of a new cell and end of last cell
+    else{ 
+        int last_bin_idx = cuConstParams.bin_index[v-1];
+        if(bin_idx != last_bin_idx){
+            cuConstParams.bin_start_index[bin_idx] = v;
+            cuConstParams.bin_end_index[last_bin_idx] = v;
+        }
+    }
+    // last cell
+    if(v == cuConstParams.num_points - 1){ 
+        cuConstParams.bin_end_index[bin_idx] = cuConstParams.num_points;
+    }
+}
+
+```
+
+Then similar as before, we calculate the degree for each point, but now since we know that the side length of each bin is $\epsilon$, for any point $p$ in a specific cell, its neighbors could only possibly be in the 8 sorrounding cells.
+
+```
+__device__ size_t
+degree_in_bin(float2 p1, int neighbor_bin_id)
+
+__global__ void
+degree_kernel(){
+	int v = blockIdx.x * blockDim.x + threadIdx.x;
+	if (v >= cuConstParams.num_points) return; 
+	size_t pid = cuConstParams.point_index[v];
+	float2 p1 = ((float2*)(cuConstParams.points))[pid];
+	int bin_idx = cuConstParams.bin_index[v];
+	size_t degree = 0;
+	for(int neighbor_bin_id ...){
+    	degree += degree_in_bin(p1, neighbor_bin_id);
+	}
+    cuConstParams.degree[pid] = degree;
+}
+```
+
+| point id | 0 | 1 | 2 | 3 | 4 | 5 | 
+|----------|---|---|---|---|---|---|
+| degree   | 1 | 3 | 3 | 2 | 3 | 2 |
+
+Then `thrust::exclusive_scan` to get the `start_index` in the `adj_list` for each point:
+
+| point id | 0 | 1 | 2 | 3 | 4 | 5  |
+|----------|---|---|---|---|---|----|
+| start index| 0 | 1 | 4 | 7 | 9 | 12 |
+
+And finally, we scan for each point its neighbors in surrounding cells again to get the final `adj_list`:
+
+| point id  | 0 | 1 |   |   | 2 |   |   | 3 |   | 4 |   |   | 5 |
+|-----------|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| neighbors | 0 | 1 | 2 | 4 | 1 | 2 | 4 | 3 | 5 | 1 | 2 | 4 | 3 |
+
+#### BFS
+The bfs part stays the same as in naive `G-DBSCAN`
+
 
 ### RP-DBSCAN
 
