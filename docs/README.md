@@ -292,11 +292,11 @@ For comparison, we use `sklearn.cluster.DBSCAN`, which is implemented in Cython 
 
 We adapt the more classis test cases from [RP-DBSCAN], but also invent some test cases ourselves to really push the limit as all classic test cases only have 100,000 points.
 
-| test case\scanner type   | sklearn.cluster.DBSCAN | seq | G-DBSCAN | G-DBSCAN Data  Parallel |
-|--------------------------|------------------------|-----|---------|-----------------------|
-| moon(eps=0.01, N=5)      | KILLED                 | *   | 366.3ms | 188.6ms              | 
-| chameleon(eps=0.05, N=3) | KILLED                 | *   | 623ms   | 238ms                 | 
-| blobs(eps=0.01, N=10)    | KILLED                 | *   | 654ms   | 220ms                 |
+| test case\scanner type    | sklearn.cluster.DBSCAN | seq | G-DBSCAN | G-DBSCAN Data Parallel |
+|---------------------------|------------------------|-----|----------|------------------------|
+| moon(eps=0.01, N=5)       | KILLED                 | *   | 366.3ms  | 188.6ms                | 
+| chameleon(eps=0.05, N=3)  | KILLED                 | *   | 623ms    | 238ms                  | 
+| blobs(eps=0.01, N=10)     | KILLED                 | *   | 654ms    | 220ms                  |
 
 We see that `sklearn.cluster.DBSCAN` got killed here (although we didn't find a specific reason for it), the sequential $O(n^2)$ version is simply taking too long and we never expect it to finish. We notice that `G-DBSCAN Data Parallel` consistently performs better. However, we should also note that hyper-parameters here are very important as suppose we are given a huge $\epsilon$ then basically all points will be connected and there will only be a single cluster. In this case we would have very few cells and it won't help.  The plots also show that the result is sensitive to hyper-parameters. We expected a better result for chameleon but aren't able to get hyper-parameters correct.
 ![chameleon](image/chameleon.png)
@@ -308,15 +308,15 @@ We also come up with some test cases our own: random and rings, basically the fo
 ![](image/rings.png)
 ![](image/random.png)
 
-|               | gdbscan(ms) | ref(ms)     | seq(ms)     |
-|---------------|---------|---------|----------|
-| rings-1000    | 147.05  | 6.46    | 5.91     |
-| rings-10000   | 98.07   | 175.02  | 262.81   |
-| rings-100000  | 349.97  | 5928.06 | 19081.30 |
-| random-1000   | 144.36  | 5.28    | 2.88     |
-| random-10000  | 112.55  | 118.40  | 211.66   |
-| random-100000 | 182.39  | 3645.03 | 16317.20 |
-
+| test case\scanner type  | G-DBSCAN Data Parallel(ms) | sklearn.cluster.DBSCAN(ms) | seq(ms)  |
+|-------------------------|----------------------------|----------------------------|----------|
+| rings-1000              | 147.05                     | 6.46                       | 5.91     |
+| rings-10000             | 98.07                      | 175.02                     | 262.81   |
+| rings-100000            | 349.97                     | 5928.06                    | 19081.30 |
+| random-1000             | 144.36                     | 5.28                       | 2.88     |
+| random-10000            | 112.55                     | 118.40                     | 211.66   |
+| random-100000           | 182.39                     | 3645.03                    | 16317.20 |
+ 
 ## Work Distribution
 Yueni Liu and Sailun Xu contribute equally in this project on all parts.
 
