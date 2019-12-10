@@ -453,7 +453,7 @@ GDBScanner::construct_graph(){
                 cudaMemcpyDeviceToHost);
     adj_list_size = last_degree + last_index;
     cudaMalloc(&device_adj_list, sizeof(size_t) * adj_list_size);
-    std::cout << "adj list size: " << adj_list_size << std::endl;
+    // std::cout << "adj list size: " << adj_list_size << std::endl;
 
     // copy over new constants
     GlobalConstants params;
