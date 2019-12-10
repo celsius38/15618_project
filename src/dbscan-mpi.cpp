@@ -51,17 +51,13 @@ public:
     }
 
     ~RPDBScanner() {
-        if(params.points) delete[] params.points;
-        if(params.point_index) delete[] params.point_index;
-        if(params.cell_index) delete[] params.cell_index;
-        if(params.cell_start_index) delete[] params.cell_start_index;
-        if(params.cell_end_index) delete[] params.cell_end_index;
     }
 
     size_t scan(std::vector<Vec2> &points, 
                 std::vector<int> &labels, 
                 float eps, 
                 size_t minPts) {
+        labels.resize(points.size(), -1);
         // other workers' cluster count will not be changed
         // indicate main function its identity
         // only master will print out messages
@@ -77,10 +73,6 @@ public:
         construct_global_graph(&params, point_index, cell_index, cell_start_index, cell_end_index);
         std::vector<int> local_cell_index = random_split(numtasks, taskid);
         size_t local_cell_count = local_cell_index.size();
-        for(size_t i = 0; i < 10; ++i){
-            std::cout << cell_start_index[i] << " " << cell_end_index[i] << std::endl;
-        }
-        std::cout << "stage 1 finished" << std::endl;
 
         // Stage 2: build local clustering
         std::vector<size_t> local_point_id;
@@ -97,7 +89,6 @@ public:
 
         size_t local_point_count = local_point_id.size();
         size_t local_adj_list_len = local_adj_list.size(); 
-        std::cout << "stage 2 finished" << std::endl;
 
         // Stage 3: merge clustering
         if(taskid != MASTER) {
@@ -205,7 +196,6 @@ private:
         this -> cell_index = new size_t[params.num_points];
         this -> cell_start_index = new size_t[params.num_cells];
         this -> cell_end_index = new size_t[params.num_cells];
-        std::cout << "setup host success" << std::endl;
 
         // set up device data
         setup_device(&params, points);
@@ -366,15 +356,15 @@ void constructLocalCellGraph(std::vector<int>& local_cell_index,
                 }else{
                     local_point_is_core.push_back(0);
                 }
-            }
-            cell.degree = cell_neighbour_cells.size(); 
+            } 
+            cell.start_index = local_adj_list.size();
             if(cell.is_core){
-                cell.start_index = local_adj_list.size();
+                cell.degree = cell_neighbour_cells.size();
                 local_adj_list.insert(local_adj_list.end(), 
                                       cell_neighbour_cells.begin(),
                                       cell_neighbour_cells.end());
-                local_partition.push_back(cell);
             }
+            local_partition.push_back(cell);
         }
     }
 
